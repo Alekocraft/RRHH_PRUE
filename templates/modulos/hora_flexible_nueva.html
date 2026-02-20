@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Hora flexible - Nueva{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Nueva solicitud de hora flexible</h4>
+    <p class="text-muted">Crea la solicitud y la envía al workflow (SP <code>rrhh.sp_submit_request</code>).</p>
+
+    <form method="post" class="row g-3">
+      <div class="col-12 col-lg-4">
+        <label class="form-label">Fecha</label>
+        <input class="form-control" type="date" name="reduction_date" required>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label">Horario</label>
+        <select class="form-select" name="slot" required>
+          <option value="AM">AM (llegar 1h tarde)</option>
+          <option value="PM">PM (salir 1h antes)</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label">Motivo</label>
+        <input class="form-control" name="reason" required>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary">Enviar</button>
+        <a class="btn btn-link" href="{{ url_for('modulos.hora_flexible') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

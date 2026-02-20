@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar empleado · Administración{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Editar empleado</h1>
+      <p>Actualiza datos y banderas de control (activo / ejecutivos / trabajo en casa).</p>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Volver</a>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:980px;">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">{{ emp.last_name }}, {{ emp.first_name }}</h2>
+        <p class="card-subtitle">{{ emp.doc_number }}</p>
+      </div>
+    </div>
+
+    <form method="post">
+      <div class="form-row">
+        <div>
+          <label>Cédula</label>
+          <input name="doc_number" id="doc_number" required value="{{ emp.doc_number }}">
+        </div>
+        <div>
+          <label>Nombre</label>
+          <input name="first_name" id="first_name" required value="{{ emp.first_name }}">
+        </div>
+        <div>
+          <label>Apellido</label>
+          <input name="last_name" id="last_name" required value="{{ emp.last_name }}">
+        </div>
+      </div>
+
+      <div class="form-row mt-12">
+        <div>
+          <label>Email</label>
+          <input name="email" id="email" value="{{ emp.email or '' }}">
+        </div>
+        <div>
+          <label>Departamento</label>
+          <input name="department" id="department" value="{{ emp.department or '' }}">
+        </div>
+        <div>
+          <label>Cargo</label>
+          <input name="position_name" id="position_name" value="{{ emp.position_name or '' }}">
+        </div>
+      </div>
+
+      <div class="form-row mt-12">
+        <div>
+          <label>Jefe</label>
+          <select name="manager_employee_id" id="manager_employee_id">
+            <option value="">— Sin jefe —</option>
+            {% for m in managers %}
+              <option value="{{ m.employee_id }}" {% if cur_mgr_id and (m.employee_id == cur_mgr_id) %}selected{% endif %}>
+                {{ m.doc_number }} - {{ m.first_name }} {{ m.last_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="form-row">
+        <div class="checkbox" style="min-width:220px; flex:0 0 auto;">
+          <input type="checkbox" id="is_active" name="is_active" {% if emp.is_active %}checked{% endif %}>
+          <label for="is_active" style="margin:0;">Activo</label>
+        </div>
+        <div class="checkbox" style="min-width:320px; flex:0 0 auto;">
+          <input type="checkbox" id="is_exec_approval_by_hr" name="is_exec_approval_by_hr" {% if emp.is_exec_approval_by_hr %}checked{% endif %}>
+          <label for="is_exec_approval_by_hr" style="margin:0;">Requiere aprobación RRHH (ejecutivos)</label>
+        </div>
+        <div class="checkbox" style="min-width:260px; flex:0 0 auto;">
+          <input type="checkbox" id="can_work_from_home" name="can_work_from_home" {% if emp.can_work_from_home %}checked{% endif %}>
+          <label for="can_work_from_home" style="margin:0;">Trabajo en casa habilitado</label>
+        </div>
+      </div>
+
+      <div class="mt-16" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn" type="submit">Guardar</button>
+        <a class="btn btn-secondary" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Hora flexible{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Hora flexible (1h)</h4>
+    <p class="text-muted mb-3">AM (llegar 1h tarde) o PM (salir 1h antes) con aprobación.</p>
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="border rounded p-3">
+          <h6>Empleado</h6>
+          <p class="mb-2">Crea una solicitud y se envía al workflow.</p>
+          <a class="btn btn-primary btn-sm" href="{{ url_for('modulos.hora_flexible_nueva') }}">Nueva solicitud</a>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="border rounded p-3">
+          <h6>Aprobación</h6>
+          <p class="mb-2">Bandeja de pasos pendientes asignados a tu usuario.</p>
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('modulos.aprobaciones') }}">Bandeja</a>
+        </div>
+      </div>
+    </div>
+
+    <hr class="my-4" />
+    <a class="btn btn-link p-0" href="{{ url_for('modulos.dashboard') }}">← Volver al dashboard</a>
+  </div>
+</div>
+{% endblock %}

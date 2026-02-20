@@ -1,0 +1,62 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Trabajo en casa</h2>
+  <p class="small">Estos días se cruzan en Asistencia para no marcar como faltante si no hay marcaciones.</p>
+
+  <form method="post" action="{{ url_for('modulos.trabajo_casa_nuevo') }}">
+    <div class="form-row">
+      <div style="flex:2">
+        <label>Empleado</label>
+        <select name="employee_id" required>
+          <option value="">-- seleccionar --</option>
+          {% for e in empleados %}
+            <option value="{{ e.employee_id }}">{{ e.doc_number }} - {{ e.first_name }} {{ e.last_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="work_date" required>
+      </div>
+      <div style="flex:2">
+        <label>Motivo</label>
+        <input name="reason" placeholder="Trabajo en casa">
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button type="submit">Agregar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div style="overflow:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Cédula</th>
+        <th>Empleado</th>
+        <th>Motivo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in registros %}
+        <tr>
+          <td>{{ r.work_date }}</td>
+          <td>{{ r.doc_number }}</td>
+          <td>{{ r.first_name }} {{ r.last_name }}</td>
+          <td>{{ r.reason }}</td>
+        </tr>
+      {% endfor %}
+      {% if registros|length == 0 %}
+        <tr><td colspan="4" class="small">Sin registros.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

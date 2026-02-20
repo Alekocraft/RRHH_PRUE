@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Aprobaciones · Trabajo en casa{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Aprobaciones</h1>
+      <p>
+        Bandeja de solicitudes asignadas a ti.
+        {% if is_backoffice %} RRHH puede ver todas.{% endif %}
+      </p>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('modulos.dashboard') }}">Volver</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Pendientes</h2>
+        <p class="card-subtitle">Aprueba o rechaza. La decisión queda registrada.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Fecha</th>
+            <th>Motivo</th>
+            <th>Estado</th>
+            <th style="min-width:220px">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if pendientes and (pendientes|length) > 0 %}
+            {% for s in pendientes %}
+              <tr>
+                <td>
+                  <div style="font-weight:600;">{{ s.employee_name }}</div>
+                  {% if s.doc_number %}<div class="small" style="color:var(--muted);">{{ s.doc_number }}</div>{% endif %}
+                </td>
+                <td>{{ s.work_date }}</td>
+                <td>{{ s.reason or '' }}</td>
+                <td><span class="badge badge-warn">{% if two_step %}{% if is_backoffice %}Pendiente RRHH{% else %}Pendiente Jefe{% endif %}{% else %}Pendiente{% endif %}</span></td>
+                <td>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <form method="post" action="{{ url_for('modulos.trabajo_casa_aprobar') }}" style="display:inline;">
+                      <input type="hidden" name="employee_id" value="{{ s.employee_id }}">
+                      <input type="hidden" name="work_date" value="{{ s.work_date }}">
+                      <button class="btn btn-primary" type="submit">Aprobar</button>
+                    </form>
+
+                    <form method="post" action="{{ url_for('modulos.trabajo_casa_rechazar') }}" style="display:inline;">
+                      <input type="hidden" name="employee_id" value="{{ s.employee_id }}">
+                      <input type="hidden" name="work_date" value="{{ s.work_date }}">
+                      <button class="btn btn-ghost" type="submit" onclick="return confirm('¿Rechazar esta solicitud?');">Rechazar</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="small">No tienes solicitudes pendientes asignadas.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Aprobadas recientes</h2>
+        <p class="card-subtitle">Últimos 60 días (solo lectura).</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Fecha</th>
+            <th>Motivo</th>
+            <th>Estado</th>
+            <th>Creada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if aprobadas and (aprobadas|length) > 0 %}
+            {% for s in aprobadas %}
+              <tr>
+                <td>
+                  <div style="font-weight:600;">{{ s.employee_name }}</div>
+                  {% if s.doc_number %}<div class="small" style="color:var(--muted);">{{ s.doc_number }}</div>{% endif %}
+                </td>
+                <td>{{ s.work_date }}</td>
+                <td>{{ s.reason or '' }}</td>
+                <td><span class="badge badge-ok">Aprobada</span></td>
+                <td class="small">{{ s.created_at }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="small">No hay aprobadas recientes.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

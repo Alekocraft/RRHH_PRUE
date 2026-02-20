@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}Ajuste asistencia · RRHH{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Ajuste de asistencia</h1>
+      <p>Modifica marcaciones del día seleccionado (queda auditado).</p>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia', year=work_date.year, month=work_date.month) }}">Volver</a>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:980px;">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">{{ emp.last_name }}, {{ emp.first_name }}</h2>
+        <p class="card-subtitle">{{ emp.doc_number }} · {{ work_date.strftime('%Y-%m-%d') }}</p>
+      </div>
+      <div class="card-actions">
+        {% if shift %}
+          <span class="badge">Turno {{ shift.shift_code }} ({{ shift.start_time }}–{{ shift.end_time }})</span>
+        {% else %}
+          <span class="badge-gray">Sin turno asignado</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Marcación actual - Entrada</label>
+        <input value="{{ att.first_in or '' }}" disabled>
+      </div>
+      <div>
+        <label>Marcación actual - Salida</label>
+        <input value="{{ att.last_out or '' }}" disabled>
+      </div>
+      <div>
+        <label>Total actual (min)</label>
+        <input value="{{ att.total_minutes or 0 }}" disabled>
+      </div>
+      <div>
+        <label>Requerido (min)</label>
+        <input value="{{ required_minutes }}" disabled>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <form method="post">
+      <div class="form-row">
+        <div>
+          <label>Nueva entrada</label>
+          <input type="time" name="first_in" value="{{ att.first_in or '' }}">
+        </div>
+        <div>
+          <label>Nueva salida</label>
+          <input type="time" name="last_out" value="{{ att.last_out or '' }}">
+        </div>
+        <div style="min-width:260px;flex:2">
+          <label>Motivo (obligatorio)</label>
+          <input name="reason" maxlength="150" placeholder="Ej: Ajuste por olvido de marcación" required>
+        </div>
+      </div>
+
+      <div class="mt-12">
+        <label>Comentario (opcional)</label>
+        <textarea name="comment" maxlength="500" placeholder="Detalles adicionales..."></textarea>
+      </div>
+
+      <div class="mt-16" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn" type="submit">Guardar ajuste</button>
+        <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia', year=work_date.year, month=work_date.month) }}">Cancelar</a>
+      </div>
+
+      <p class="small mt-12 m-0">Este ajuste crea un registro en <strong>rrhh.att_manual_override</strong> y se reflejará en el consolidado.</p>
+    </form>
+  </div>
+{% endblock %}

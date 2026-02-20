@@ -1,0 +1,18 @@
+/* Fix alineación del botón "Cerrar sesión" sin tocar colores del tema */
+.userbox{
+  align-items:center;
+  flex-wrap:nowrap;
+}
+.userbox__meta{
+  justify-content:center;
+  line-height:1.15;
+  white-space:nowrap;
+}
+.userbox__name,
+.userbox__role{
+  line-height:1.15;
+}
+.userbox .btn{
+  align-self:center;
+  white-space:nowrap;
+}

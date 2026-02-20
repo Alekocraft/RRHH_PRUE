@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Nuevo empleado · RRHH{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:1100px;">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Crear colaborador</div>
+      <div class="card-subtitle">Escribe <b>mínimo 3 caracteres</b>, selecciona el usuario y valida la información antes de guardar.</div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <form method="post" id="empForm">
+      <!-- Buscar -->
+      <div style="position:relative; margin-bottom:14px;">
+        <label class="label">Buscar en AD</label>
+        <input class="input" id="adSearch" autocomplete="off" placeholder="Nombre, apellido o samAccountName"
+               value="{{ (form.get('ad_search') if form else '') or '' }}">
+        <div id="suggestions" class="card"
+             style="display:none; position:absolute; z-index:50; left:0; right:0; margin-top:8px; box-shadow:0 18px 45px rgba(15,23,42,.14);"></div>
+      </div>
+
+      <!-- 2 columnas (sin depender de .grid/.col-*) -->
+      <div class="form-row">
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Usuario<span style="color:red;">*</span></label>
+          <input class="input" id="ad_username" name="ad_username" readonly required
+                 value="{{ (form.get('ad_username') if form else '') or '' }}">
+        </div>
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Cédula <span style="color:red;">*</span></label>
+          <input class="input" id="doc_number" name="doc_number" required
+                 value="{{ (form.get('doc_number') if form else '') or '' }}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Nombres <span style="color:red;">*</span></label>
+          <input class="input" id="first_name" name="first_name" required
+                 value="{{ (form.get('first_name') if form else '') or '' }}">
+        </div>
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Apellidos <span style="color:red;">*</span></label>
+          <input class="input" id="last_name" name="last_name" required
+                 value="{{ (form.get('last_name') if form else '') or '' }}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Dirección de correo electrónico</label>
+          <input class="input" id="email" name="email"
+                 value="{{ (form.get('email') if form else '') or '' }}">
+        </div>
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Área / Departamento</label>
+          <input class="input" id="department" name="department"
+                 value="{{ (form.get('department') if form else '') or '' }}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Cargo</label>
+          <input class="input" id="position_name" name="position_name"
+                 value="{{ (form.get('position_name') if form else '') or '' }}">
+        </div>
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Jefe inmediato (asignación)</label>
+          <select class="input" id="manager_employee_id" name="manager_employee_id">
+            <option value="">— Seleccionar —</option>
+            {% for m in managers %}
+              <option
+                value="{{ m.employee_id }}"
+                data-sam="{{ (m.ad_username or '') }}"
+                {% if cur_mgr_id and (cur_mgr_id|int) == (m.employee_id|int) %}selected{% endif %}
+              >
+                {{ m.last_name }}, {{ m.first_name }}{% if m.doc_number %} · {{ m.doc_number }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <div id="managerHint" style="margin-top:6px; font-size:12px; color:var(--muted);"></div>
+        </div>
+      </div>
+
+      <!-- Checks (2 columnas) -->
+      <div class="form-row" style="margin-top:6px;">
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label style="display:flex; align-items:flex-start; gap:.55rem; cursor:pointer;">
+            <input type="checkbox" name="can_work_from_home" id="can_work_from_home"
+                   {% if form and form.get('can_work_from_home') %}checked{% endif %}
+                   style="width:1.05rem; height:1.05rem; margin-top:.15rem;">
+            <span style="line-height:1.25;">
+              <strong style="display:block;">Trabajo en casa</strong>
+              <span class="small">Permite solicitar trabajo remoto</span>
+            </span>
+          </label>
+        </div>
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label style="display:flex; align-items:flex-start; gap:.55rem; cursor:pointer;">
+            <input type="checkbox" name="is_exec_approval_by_hr" id="is_exec_approval_by_hr"
+                   {% if form and form.get('is_exec_approval_by_hr') %}checked{% endif %}
+                   style="width:1.05rem; height:1.05rem; margin-top:.15rem;">
+            <span style="line-height:1.25;">
+              <strong style="display:block;">Requiere aprobación RRHH (ejecutivos)</strong>
+              <span class="small">El flujo inicia en RRHH</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Checklist compacto -->
+      <div class="card" style="margin-top:12px; background:#fff;">
+        <div style="padding:12px 14px;">
+          <div style="font-weight:700; margin-bottom:8px;">📋 Checklist</div>
+          <div class="small" style="margin-bottom:10px;">Revisa lo mínimo antes de guardar:</div>
+          <ul id="checklist" style="list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr 1fr; gap:8px 14px;">
+            <li data-check="ad"><span class="mark">•</span> Usuario (*)</li>
+            <li data-check="doc"><span class="mark">•</span> Cédula (*)</li>
+            <li data-check="name"><span class="mark">•</span> Nombres y apellidos (*)</li>
+            <li data-check="mgr"><span class="mark">•</span> Jefe (recomendado) </li>
+          </ul>
+          <div class="small" style="margin-top:10px;">
+            💡 Si no se asigna jefe, el flujo usa RRHH como respaldo.
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+        <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Cancelar</a>
+        <button class="btn btn-primary" type="submit">Guardar empleado</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const input = document.getElementById('adSearch');
+  const box = document.getElementById('suggestions');
+  const $ = (id) => document.getElementById(id);
+
+  function onlyDigits(v){
+    const s = String(v || '').trim();
+    const d = s.replace(/\\D+/g,'');
+    return d || '';
+  }
+
+  function setOk(key, ok){
+    const li = document.querySelector('[data-check="'+key+'"]');
+    if(!li) return;
+    const mark = li.querySelector('.mark');
+    if(!mark) return;
+    mark.textContent = ok ? '✓' : '•';
+    li.style.opacity = ok ? '1' : '.75';
+  }
+
+  function updateChecklist(){
+    setOk('ad', ($('ad_username').value || '').trim().length > 0);
+    setOk('name', ($('first_name').value || '').trim().length > 0 && ($('last_name').value || '').trim().length > 0);
+    setOk('doc', ($('doc_number').value || '').trim().length > 0);
+    setOk('mgr', ($('manager_employee_id').value || '').trim().length > 0);
+  }
+
+  function clearSuggestions(){
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
+
+  function renderItem(it){
+    const div = document.createElement('div');
+    div.style.padding = '10px 12px';
+    div.style.cursor = 'pointer';
+    div.style.borderTop = '1px solid rgba(2,6,23,.08)';
+    const dn = onlyDigits(it.doc_number);
+
+    div.innerHTML = `
+      <div style="font-weight:700;">${it.display_name || ((it.first_name||'')+' '+(it.last_name||'')).trim()}</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:3px;">
+        <span>${it.sam || ''}</span>
+        ${dn ? ' · <span>Cédula: '+dn+'</span>' : ''}
+        ${it.department ? ' · <span>'+it.department+'</span>' : ''}
+        ${it.title ? ' · <span>'+it.title+'</span>' : ''}
+      </div>
+    `;
+    div.addEventListener('click', ()=>selectItem(it));
+    return div;
+  }
+
+  function selectItem(it){
+    $('ad_username').value = it.sam || '';
+    $('first_name').value = it.first_name || '';
+    $('last_name').value = it.last_name || '';
+    $('email').value = it.mail || '';
+    $('doc_number').value = onlyDigits(it.doc_number);
+    $('department').value = it.department || '';
+    $('position_name').value = it.title || '';
+
+    if(it.manager_sam){
+      const opts = Array.from($('manager_employee_id').options);
+      const match = opts.find(o => (o.dataset && o.dataset.sam || '').toLowerCase() === String(it.manager_sam).toLowerCase());
+      if(match){ $('manager_employee_id').value = match.value; }
+      $('managerHint').innerHTML = 'Jefe detectado en AD: <b>' + it.manager_sam + '</b> (si existe en el portal se preselecciona).';
+    } else {
+      $('managerHint').textContent = '';
+    }
+
+    clearSuggestions();
+    updateChecklist();
+  }
+
+  let timer = null;
+  async function doSearch(q){
+    if(q.length < 3){ clearSuggestions(); return; }
+    try{
+      const res = await fetch('{{ url_for("admin_rrhh.ldap_search") }}?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      const items = data.items || [];
+      box.innerHTML = '';
+      if(items.length === 0){
+        const empty = document.createElement('div');
+        empty.style.padding = '10px 12px';
+        empty.style.color = 'var(--muted)';
+        empty.textContent = 'Sin resultados.';
+        box.appendChild(empty);
+      } else {
+        items.slice(0, 15).forEach((it)=> box.appendChild(renderItem(it)));
+      }
+      box.style.display = 'block';
+    }catch(e){
+      clearSuggestions();
+    }
+  }
+
+  input.addEventListener('input', (e)=>{
+    const q = e.target.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(()=>doSearch(q), 220);
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!box.contains(e.target) && e.target !== input){ clearSuggestions(); }
+  });
+
+  ['ad_username','first_name','last_name','doc_number','manager_employee_id'].forEach((id)=>{
+    const el = $(id);
+    if(el){
+      el.addEventListener('input', updateChecklist);
+      el.addEventListener('change', updateChecklist);
+    }
+  });
+
+  updateChecklist();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Bandeja de aprobaciones{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Bandeja de aprobaciones</h4>
+    <p class="text-muted">Pasos pendientes asignados a tu usuario.</p>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr><th>Request</th><th>Tipo</th><th>Paso</th><th>Empleado</th><th>Creada</th><th>Acción</th></tr>
+        </thead>
+        <tbody>
+          {% for s in steps %}
+          <tr>
+            <td>{{ s.request_id }}</td>
+            <td>{{ s.request_type }}</td>
+            <td>{{ s.step_no }}</td>
+            <td>{{ s.employee_id }}</td>
+            <td>{{ s.created_at }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary" disabled>Aprobar/Rechazar (próx.)</button>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not steps %}
+          <tr><td colspan="6" class="text-center text-muted">Sin pendientes</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="btn btn-link p-0" href="{{ url_for('modulos.dashboard') }}">← Volver al dashboard</a>
+  </div>
+</div>
+{% endblock %}

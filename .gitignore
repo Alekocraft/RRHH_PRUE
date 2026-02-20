@@ -1,0 +1,287 @@
+# ============================================
+# ARCHIVOS IGNORADOS POR SEGURIDAD Y DESARROLLO
+# ============================================
+
+# --------------------------------------------
+# Archivos de Python
+# --------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# --------------------------------------------
+# Archivos de desarrollo/IDE
+# --------------------------------------------
+# Visual Studio
+.vs/
+*.vsidx
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VSCode
+.vscode/*
+# !.vscode/settings.json    # COMENTADO: No subir configuraciones de VSCode
+# !.vscode/tasks.json       # COMENTADO: No subir configuraciones de VSCode
+# !.vscode/launch.json      # COMENTADO: No subir configuraciones de VSCode
+# !.vscode/extensions.json  # COMENTADO: No subir configuraciones de VSCode
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# NetBeans
+nbproject/
+nb-configuration.xml
+
+# Sublime Text
+*.sublime-*
+*.sublime-workspace
+
+# --------------------------------------------
+# Archivos de sistema y temporales
+# --------------------------------------------
+# Archivos temporales
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+~$*
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archivos de sistema Windows
+Desktop.ini
+[Hh]umbs.db
+*.stackdump
+
+# Archivos de recuperación
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+
+# --------------------------------------------
+# Secretos y configuraciones sensibles
+# --------------------------------------------
+# Archivos de entorno (NO SUBIR NUNCA!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+.secrets/
+secret/
+secrets/
+credentials/
+keys/
+
+# Claves SSH
+id_rsa
+id_rsa.pub
+id_dsa
+id_dsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+known_hosts
+
+# Certificados SSL
+*.pem
+*.crt
+*.key
+*.p12
+*.pfx
+*.cer
+
+# Configuraciones de base de datos
+*.db
+*.sqlite
+*.sqlite3
+dump.sql
+backup.sql
+*.dump
+*.backup
+
+# Archivos de configuración local
+config.local.*
+settings.local.*
+*.local.*
+local.properties
+local_settings.py
+
+# --------------------------------------------
+# Archivos de build y dependencias
+# --------------------------------------------
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json  # Considera si quieres ignorarlo o no
+yarn.lock
+
+# Python virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Ruby
+/.bundle
+/vendor/bundle
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# --------------------------------------------
+# Archivos específicos de proyecto
+# --------------------------------------------
+# Docker
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# --------------------------------------------
+# Archivos de medios grandes
+# --------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.iso
+*.dmg
+
+# --------------------------------------------
+# Documentación generada
+# --------------------------------------------
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+docs/_build/
+docs/_site/
+
+# ============================================
+# REGLAS ESPECÍFICAS PARA SEGURIDAD
+# ============================================
+
+# Ignorar cualquier archivo con "secret" o "password" en el nombre
+*secret*
+*password*
+*credential*
+*key*
+*token*
+*api_key*
+*private*
+*sensitive*
+*confidential*
+
+# Archivos de dump/memoria
+core
+*.core
+core.*
+memory.dmp
+heapdump.*
+*.hprof
+*.dmp
+
+# Archivos de sesión
+*.session
+*session*
+
+# Archivos de cache de aplicaciones
+.cache/
+*.cache
+
+# Archivos de usuario específico
+*.userprefs
+
+ 

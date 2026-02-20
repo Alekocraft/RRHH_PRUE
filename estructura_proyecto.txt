@@ -1,0 +1,100 @@
+ESTRUCTURA DEL PROYECTO FLASK 
+============================= 
+Fecha: Tue 02/17/2026 18:27:23.43 
+Directorio actual: C:\Users\sinventarios\source\repos\rrhh_prue 
+ 
+[ARCHIVOS PRINCIPALES .PY] 
+-------------------------- 
+app.py 
+db.py 
+blueprints\admin_rrhh.py 
+blueprints\auth.py 
+blueprints\modulos.py 
+blueprints\__init__.py 
+config\db_config.py 
+config\ldap_config.py 
+config\__init__.py 
+models\modulos_cedula.py 
+models\user.py 
+models\__init__.py 
+services\hr_employee_service.py 
+services\ldap_auth.py 
+services\ldap_directory.py 
+services\org_excel.py 
+services\rrhh_db.py 
+services\rrhh_security.py 
+services\rrhh_user.py 
+services\upload.py 
+services\__init__.py 
+utils\authz.py 
+utils\ldap_utils.py 
+utils\__init__.py 
+ 
+[ARCHIVOS HTML en /templates/] 
+------------------------------ 
+templates\base.html 
+templates\dashboard.html 
+templates\perfil_pendiente.html 
+templates\admin\empleado_editar.html 
+templates\admin\empleado_nuevo.html 
+templates\admin\usuarios.html 
+templates\auth\login.html 
+templates\auth\perfil_pendiente.html 
+templates\modulos\aprobaciones.html 
+templates\modulos\asistencia.html 
+templates\modulos\asistencia_ajuste.html 
+templates\modulos\asistencia_cargar.html 
+templates\modulos\hora_flexible.html 
+templates\modulos\hora_flexible_nueva.html 
+templates\modulos\trabajo_casa.html 
+templates\modulos\turnos.html 
+templates\modulos\turnos_asignar.html 
+ 
+[ARCHIVOS CSS en /static/] 
+------------------------- 
+static\css\login.css 
+static\css\style.css 
+ 
+[ARCHIVOS JS en /static/] 
+------------------------- 
+ 
+[ARCHIVOS DE CONFIGURACION] 
+--------------------------- 
+requirements.txt 
+.env 
+ 
+[ARCHIVOS DE ENTORNO] 
+-------------------- 
+.env 
+.env 
+ 
+[ARCHIVOS DE LOGS] 
+------------------ 
+ 
+[CARPETAS PRINCIPALES (excluyendo entornos virtuales)] 
+------------------------------------------------------ 
+[.vs] 
+[blueprints] 
+[config] 
+[models] 
+[services] 
+[static] 
+[templates] 
+[uploads] 
+[utils] 
+[__pycache__] 
+ 
+Resumen: 
+--------- 
+Archivos .py: 24 
+Archivos HTML: 17 
+Archivos CSS: 2 
+Archivos JS: 0 
+Archivos de entorno: 2 
+Archivos de logs: 0 
+Carpetas (sin entornos virtuales): 10 
+ 
+[ENTORNOS VIRTUALES EXCLUIDOS] 
+------------------------------ 
+env 
+ 

@@ -1,0 +1,69 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <h2 style="margin:0;">Usuarios</h2>
+    <a href="{{ url_for('admin_rrhh.empleado_nuevo') }}"><button type="button">Crear colaborador</button></a>
+  </div>
+  <p class="small">Asocia usuarios AD a empleados (por cédula) y asigna el rol <b>Administrador</b>.</p>
+</div>
+
+<div class="card">
+  <div style="overflow:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Usuario AD</th>
+        <th>Cédula</th>
+        <th>Nombre</th>
+        <th>Empleado asociado</th>
+        <th>Rol Administrador</th>
+        <th>Activo</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <form method="post" action="{{ url_for('admin_rrhh.usuarios_actualizar') }}">
+          <input type="hidden" name="user_id" value="{{ u.user_id }}">
+          <td>{{ u.ad_username }}</td>
+          <td>{{ u.doc_number or '-' }}</td>
+          <td>{{ (u.first_name or '') ~ ' ' ~ (u.last_name or '') }}</td>
+
+          <td>
+            <select name="employee_id">
+              <option value="">-- seleccionar --</option>
+              {% for e in empleados %}
+                <option value="{{ e.employee_id }}" {% if u.employee_id == e.employee_id %}selected{% endif %}>
+                  {{ e.doc_number }} - {{ e.first_name }} {{ e.last_name }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if u.employee_id %}
+              <div class="small" style="margin-top:4px;">
+                <a href="{{ url_for('admin_rrhh.empleado_editar', employee_id=u.employee_id) }}">Editar empleado</a>
+              </div>
+            {% endif %}
+          </td>
+
+          <td style="text-align:center;">
+            <input type="checkbox" name="role_ADMINISTRADOR" {% if 'ADMINISTRADOR' in u.roles %}checked{% endif %}>
+          </td>
+
+          <td style="text-align:center;">
+            <input type="checkbox" name="is_active" {% if u.is_active %}checked{% endif %}>
+          </td>
+
+          <td>
+            <button type="submit">Guardar</button>
+          </td>
+        </form>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

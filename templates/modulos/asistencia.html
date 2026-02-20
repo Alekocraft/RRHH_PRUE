@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Asistencia · RRHH{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Asistencia</h1>
+      <p>Consolidado mensual (turno vs. marcaciones) con enlaces rápidos para ajustes.</p>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia_cargar') }}">Cargar archivo</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Periodo</h2>
+        <p class="card-subtitle">Cambia año/mes y recarga la tabla.</p>
+      </div>
+    </div>
+
+    <form method="get" class="form-row">
+      <div style="min-width:140px;flex:0 0 auto;">
+        <label>Año</label>
+        <input type="number" name="year" value="{{ year }}" min="2000" max="2100" />
+      </div>
+      <div style="min-width:140px;flex:0 0 auto;">
+        <label>Mes</label>
+        <select name="month">
+          {% for m in range(1,13) %}
+            <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ '%02d'|format(m) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="min-width:160px;flex:0 0 auto;">
+        <button class="btn" type="submit">Ver</button>
+      </div>
+    </form>
+
+    <p class="small mt-12 m-0">Tip: haz clic en un día con estado <strong>I</strong> o <strong>F</strong> para abrir el ajuste.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Consolidado</h2>
+        <p class="card-subtitle">{{ year }}-{{ '%02d'|format(month) }} · {{ days|length }} días</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="sticky-col sticky-col-1">Empleado</th>
+            <th class="sticky-col sticky-col-2">Doc</th>
+            <th class="sticky-col" style="left:290px; min-width:120px;">Turno</th>
+            <th class="sticky-col" style="left:410px; min-width:160px;">Resumen</th>
+            {% for d in days %}
+              <th style="min-width:52px; text-align:center">{{ d.day }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in matrix %}
+            <tr>
+              <td class="sticky-col sticky-col-1"><strong>{{ r.name }}</strong></td>
+              <td class="sticky-col sticky-col-2">{{ r.doc_number }}</td>
+              <td class="sticky-col" style="left:290px; min-width:120px;">{{ r.shift }}</td>
+              <td class="sticky-col" style="left:410px; min-width:160px;">
+                <span class="badge-ok">OK {{ r.summary.ok }}</span>
+                <span class="badge-warn">I {{ r.summary.incompleto }}</span>
+                <span class="badge-danger">F {{ r.summary.falta }}</span>
+              </td>
+              {% for c in r.days %}
+                {% set st = c.status %}
+                {% set cls = 'cell cell-gray' if st in ['—','ST'] else ('cell cell-home' if st == 'CASA' else ('cell cell-bad' if st == 'F' else ('cell cell-warn' if st == 'I' else 'cell cell-ok'))) %}
+                <td style="text-align:center">
+                  {% if c.link %}
+                    <a href="{{ c.link }}" class="{{ cls }}" title="{{ c.title }}">{{ st }}</a>
+                  {% else %}
+                    <span class="{{ cls }}" title="{{ c.title }}">{{ st }}</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

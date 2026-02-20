@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Trabajo en casa · Solicitar{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Trabajo en casa</h1>
+      <p>Crea una solicitud. Si está habilitado para tu perfil, pasará a aprobación del jefe.</p>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('modulos.dashboard') }}">Volver</a>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:980px;">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Nueva solicitud</h2>
+        <p class="card-subtitle">Selecciona la fecha y describe el motivo.</p>
+      </div>
+    </div>
+
+    <form method="post">
+      <div class="form-row">
+        <div style="min-width:220px;flex:0 0 auto;">
+          <label>Fecha</label>
+          <input type="date" name="work_date" value="{{ today }}" required>
+        </div>
+        <div style="flex:2;min-width:320px;">
+          <label>Motivo</label>
+          <input type="text" name="reason" maxlength="250" placeholder="Ej: Visita técnica / mantenimiento / ..." required>
+        </div>
+      </div>
+
+      <div class="mt-16" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn" type="submit">Enviar solicitud</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card mt-16">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Mis solicitudes recientes</h2>
+        <p class="card-subtitle">Últimos registros (estado y observaciones).</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Motivo</th>
+            <th>Estado</th>
+            <th>Actualizado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent_requests %}
+            {% set st = (r.status or '')|upper %}
+            <tr>
+              <td>{{ r.work_date }}</td>
+              <td>{{ r.reason }}</td>
+              <td>
+                {% if st == 'APROBADO' %}
+                  <span class="badge-ok">Aprobado</span>
+                {% elif st == 'RECHAZADO' %}
+                  <span class="badge-danger">Rechazado</span>
+                {% else %}
+                  <span class="badge-warn">Pendiente</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ r.updated_at or '' }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="4" class="small">No hay solicitudes recientes.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

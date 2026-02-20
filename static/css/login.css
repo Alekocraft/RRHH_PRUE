@@ -1,0 +1,45 @@
+:root{
+  --rrhh-purple:#A73493;
+  --rrhh-blue:#0098B1;
+  --rrhh-gray:#D9D9D9;
+  --rrhh-bg:#f7f7fb;
+}
+
+.rrhh-login-body{
+  min-height:100vh;
+  background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(167,52,147,.18), transparent 60%),
+    radial-gradient(1200px 600px at 90% 10%, rgba(0,152,177,.18), transparent 60%),
+    linear-gradient(180deg, #ffffff, var(--rrhh-bg));
+}
+
+.rrhh-login-card{
+  border-radius: 18px;
+}
+
+.rrhh-login-logo{
+  max-height: 64px;
+  max-width: 220px;
+  object-fit: contain;
+}
+
+.rrhh-login-title{
+  color: #111827;
+}
+
+.rrhh-control:focus{
+  border-color: rgba(0,152,177,.55);
+  box-shadow: 0 0 0 .2rem rgba(0,152,177,.18);
+}
+
+.rrhh-btn-primary{
+  background-color: var(--rrhh-purple) !important;
+  border-color: var(--rrhh-purple) !important;
+}
+.rrhh-btn-primary:hover{
+  filter: brightness(.92);
+}
+
+.rrhh-link{
+  color: var(--rrhh-blue);
+}
