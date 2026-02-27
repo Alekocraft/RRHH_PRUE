@@ -42,7 +42,7 @@
                   <div style="font-weight:600;">{{ s.employee_name }}</div>
                   {% if s.doc_number %}<div class="small" style="color:var(--muted);">{{ s.doc_number }}</div>{% endif %}
                 </td>
-                <td>{{ s.work_date }}</td>
+                <td>{{ s.work_date|fecha }}</td>
                 <td>{{ s.reason or '' }}</td>
                 <td><span class="badge badge-warn">{% if two_step %}{% if is_backoffice %}Pendiente RRHH{% else %}Pendiente Jefe{% endif %}{% else %}Pendiente{% endif %}</span></td>
                 <td>
@@ -101,10 +101,10 @@
                   <div style="font-weight:600;">{{ s.employee_name }}</div>
                   {% if s.doc_number %}<div class="small" style="color:var(--muted);">{{ s.doc_number }}</div>{% endif %}
                 </td>
-                <td>{{ s.work_date }}</td>
+                <td>{{ s.work_date|fecha }}</td>
                 <td>{{ s.reason or '' }}</td>
                 <td><span class="badge badge-ok">Aprobada</span></td>
-                <td class="small">{{ s.created_at }}</td>
+                <td class="small">{{ s.created_at|fecha_hora }}</td>
               </tr>
             {% endfor %}
           {% else %}

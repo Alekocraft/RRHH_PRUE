@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user
 from werkzeug.routing import BuildError
+from urllib.parse import urlparse
 
 from models.user import User
 from services.ldap_auth import authenticate, test_connection
@@ -23,9 +24,7 @@ auth_bp = Blueprint("auth", __name__, url_prefix="")
 
 
 def _u(endpoint: str, **values) -> str:
-    """url_for tolerante: intenta con prefijo modulos.* y luego sin prefijo.
-    Evita BuildError cuando el dashboard vive en blueprints.modulos.
-    """
+    """url_for tolerante: intenta con prefijo modulos.* y luego sin prefijo."""
     candidates = [endpoint]
     if "." not in endpoint:
         candidates = [f"modulos.{endpoint}", endpoint]
@@ -36,7 +35,6 @@ def _u(endpoint: str, **values) -> str:
             return url_for(ep, **values)
         except BuildError as e:
             last_err = e
-    # Si no existe, re-levanta el último error (para depurar)
     if last_err:
         raise last_err
     raise BuildError(endpoint, values, None, None)
@@ -64,10 +62,8 @@ def _human_login_error(info: dict) -> str:
 
 
 def _build_user(rec: dict, ad_username: str, roles: list[str] | None) -> User:
-    """Construye el objeto User de forma compatible con versiones viejas/nuevas."""
     roles = roles or []
 
-    # Intenta calcular flags (best effort); si falla, load_user las recalculará por request
     can_wfh = False
     is_mgr = False
     employee_id = rec.get("employee_id")
@@ -84,7 +80,6 @@ def _build_user(rec: dict, ad_username: str, roles: list[str] | None) -> User:
         except Exception:
             is_mgr = False
 
-    # NUEVA firma: User(user_id, username, ...)
     try:
         return User(
             user_id=rec["user_id"],
@@ -97,7 +92,6 @@ def _build_user(rec: dict, ad_username: str, roles: list[str] | None) -> User:
             es_jefe=is_mgr,
         )
     except TypeError:
-        # FIRMA ANTIGUA (si existe): User({dict})
         return User(
             {
                 "user_id": rec["user_id"],
@@ -109,6 +103,38 @@ def _build_user(rec: dict, ad_username: str, roles: list[str] | None) -> User:
                 "is_manager": is_mgr,
             }
         )
+
+
+def _sanitize_next(next_url: str | None, *, is_backoffice: bool, es_jefe: bool) -> str | None:
+    """Evita redirecciones post-login a secciones restringidas.
+
+    Caso típico: el usuario cae a /login?next=/admin/... o /hora-flexible/aprobaciones.
+    Un empleado normal terminaba viendo el warning al iniciar sesión.
+    """
+    if not next_url:
+        return None
+
+    try:
+        p = urlparse(next_url)
+    except Exception:
+        return None
+
+    # Solo permitir paths relativos
+    if p.scheme or p.netloc:
+        return None
+
+    path = (p.path or "")
+
+    # Backoffice / jefes: permitir
+    if is_backoffice or es_jefe:
+        return next_url
+
+    # Empleado normal: bloquear aprobaciones/admin/turnos
+    blocked = ["/aprobaciones", "/admin", "/turnos", "/asistencia"]
+    if any(b in path for b in blocked):
+        return None
+
+    return next_url
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -129,7 +155,6 @@ def login():
             roles = get_roles(ad_username)
 
             user = _build_user(rec, ad_username, roles)
-
             login_user(user)
 
             # empleado normal sin employee_id => perfil pendiente
@@ -140,7 +165,10 @@ def login():
             ):
                 return redirect(_u("perfil_pendiente"))
 
-            next_url = request.args.get("next")
+            is_backoffice = (ROLE_ADMIN in (roles or [])) or (ROLE_RRHH in (roles or []))
+            es_jefe = bool(getattr(user, "es_jefe", False) or getattr(user, "is_manager", False))
+
+            next_url = _sanitize_next(request.args.get("next"), is_backoffice=is_backoffice, es_jefe=es_jefe)
             return redirect(next_url or _u("dashboard"))
 
         flash(_human_login_error(info), "error")

@@ -54,14 +54,28 @@ def execute(sql: str, params=()):
         conn.commit()
         return cur.rowcount
 
-
 def execute_scalar(sql: str, params=()):
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute(sql, params)
-        row = cur.fetchone()
+
+        value = None         
+        while True:
+            try:
+                row = cur.fetchone()
+                if row:
+                    value = row[0]
+                break
+            except pyodbc.ProgrammingError as e:
+                msg = str(e)
+                if ("No results" in msg) or ("Previous SQL was not a query" in msg):
+                    if not cur.nextset():
+                        break
+                    continue
+                raise
+
         conn.commit()
-        return row[0] if row else None
+        return value
 
 
 def call_proc(proc_sql: str, params=()):

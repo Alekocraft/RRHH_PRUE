@@ -233,7 +233,7 @@ def manager_has_subordinates(manager_employee_id: Optional[int], on_date: Option
     row = fetch_one(
         "SELECT TOP 1 1 "
         "FROM rrhh.hr_employee_manager "
-        "WHERE manager_employee_id=? AND valid_from <= ? AND (valid_to IS NULL OR valid_to >= ?)",
+        "WHERE manager_employee_id=? AND employee_id <> manager_employee_id AND valid_from <= ? AND (valid_to IS NULL OR valid_to >= ?)",
         (int(manager_employee_id), d, d),
     )
     return row is not None
@@ -248,7 +248,7 @@ def get_subordinates(manager_employee_id: int, on_date: Optional[date] = None) -
     rows = fetch_all(
         "SELECT employee_id "
         "FROM rrhh.hr_employee_manager "
-        "WHERE manager_employee_id=? AND valid_from <= ? AND (valid_to IS NULL OR valid_to >= ?)",
+        "WHERE manager_employee_id=? AND employee_id <> manager_employee_id AND valid_from <= ? AND (valid_to IS NULL OR valid_to >= ?)",
         (int(manager_employee_id), d, d),
     )
     return [int(r.employee_id) for r in rows]

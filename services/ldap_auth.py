@@ -1,23 +1,31 @@
 import ssl
 import logging
-
+import re
 from ldap3 import Server, Connection, ALL, SUBTREE, Tls
-from ldap3.core.exceptions import LDAPBindError
 from ldap3.utils.conv import escape_filter_chars
 
 from config.ldap_config import (
-    LDAP_ENABLED,
-    LDAP_SERVER,
-    LDAP_PORT,
-    LDAP_USE_SSL,
-    LDAP_DOMAIN,
-    LDAP_SEARCH_BASE,
-    LDAP_SERVICE_USER,
-    LDAP_SERVICE_PASSWORD,
-    LDAP_CONNECTION_TIMEOUT,
+    LDAP_ENABLED, LDAP_SERVER, LDAP_PORT, LDAP_USE_SSL,
+    LDAP_DOMAIN, LDAP_SEARCH_BASE,
+    LDAP_SERVICE_USER, LDAP_SERVICE_PASSWORD,
+    LDAP_CONNECTION_TIMEOUT
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Sub-códigos típicos devueltos por Active Directory en el mensaje de error ("data 52e", etc.)
+_AD_DATA_MAP = {
+    "525": "Usuario no encontrado",
+    "52e": "Usuario o contraseña incorrecta",
+    "530": "Logon no permitido en este momento",
+    "531": "Logon no permitido desde este equipo",
+    "532": "Contraseña expirada",
+    "533": "Cuenta deshabilitada",
+    "701": "Cuenta expirada",
+    "773": "Usuario debe cambiar la contraseña",
+    "775": "Cuenta bloqueada",
+}
 
 
 def _as_upn(user: str) -> str:
@@ -30,9 +38,29 @@ def _as_upn(user: str) -> str:
     return f"{user}@{LDAP_DOMAIN}" if LDAP_DOMAIN else user
 
 
+def _sam_only(user: str) -> str:
+    """Extrae sAMAccountName desde 'DOMINIO\\user' o 'user@dominio'."""
+    if not user:
+        return ""
+    u = user.strip()
+    if "\\" in u:
+        u = u.split("\\", 1)[1]
+    if "@" in u:
+        u = u.split("@", 1)[0]
+    return u.strip()
+
+
+def _extract_ad_data(msg: str) -> str:
+    """Extrae el subcódigo AD 'data XXX' desde el mensaje devuelto por el servidor."""
+    if not msg:
+        return ""
+    m = re.search(r"data\s+([0-9a-fA-F]{3,4})", msg)
+    return (m.group(1).lower() if m else "")
+
+
 def _server() -> Server:
     tls = None
-    # En redes internas suele bastar CERT_NONE; en producción ideal validar certificado.
+    # En entornos internos suele bastar CERT_NONE; en producción ideal validar certificado.
     if LDAP_USE_SSL:
         tls = Tls(validate=ssl.CERT_NONE)
 
@@ -42,7 +70,7 @@ def _server() -> Server:
         use_ssl=LDAP_USE_SSL,
         tls=tls,
         get_info=ALL,
-        connect_timeout=LDAP_CONNECTION_TIMEOUT,
+        connect_timeout=LDAP_CONNECTION_TIMEOUT
     )
 
 
@@ -52,7 +80,6 @@ def test_connection():
         return False, "LDAP_DISABLED"
     if not LDAP_SERVICE_USER or not LDAP_SERVICE_PASSWORD:
         return False, "LDAP_SERVICE_ACCOUNT_EMPTY (defina LDAP_SERVICE_USER y LDAP_SERVICE_PASSWORD en .env)"
-
     try:
         server = _server()
         bind_user = _as_upn(LDAP_SERVICE_USER)
@@ -65,15 +92,12 @@ def test_connection():
 
 
 def authenticate(username: str, password: str):
-    """Autentica contra AD/LDAP usando:
-
-    1) Bind con cuenta de servicio
-    2) Búsqueda del usuario
-    3) Validación de password intentando bind del usuario con varios identificadores (DN/UPN)
-
-    Esto evita problemas de formato cuando el usuario escribe "DOMINIO\\usuario".
     """
-
+    Autentica contra AD/LDAP:
+    1) Bind con cuenta de servicio
+    2) Busca DN del usuario
+    3) Bind con DN + contraseña del usuario
+    """
     if not LDAP_ENABLED:
         return False, {"error": "LDAP_DISABLED"}
 
@@ -89,9 +113,6 @@ def authenticate(username: str, password: str):
     if not LDAP_SERVICE_USER or not LDAP_SERVICE_PASSWORD:
         return False, {"error": "LDAP_SERVICE_ACCOUNT_EMPTY"}
 
-    # Si viene como DOMINIO\usuario, usar solo el sam
-    sam_input = username.split("\\")[-1].strip()
-
     try:
         server = _server()
 
@@ -100,18 +121,26 @@ def authenticate(username: str, password: str):
         svc = Connection(server, user=svc_user, password=LDAP_SERVICE_PASSWORD, auto_bind=True)
 
         # 2) Buscar DN del usuario
-        u_sam = escape_filter_chars(sam_input)
-        u_raw = escape_filter_chars(username)
-        upn_guess = escape_filter_chars(_as_upn(sam_input))
+        # Normalizamos para evitar que 'DOMINIO\\user' rompa el filtro de sAMAccountName.
+        sam_in = _sam_only(username)
 
-        # En AD, con esto suele bastar (samAccountName / userPrincipalName)
+        # Escapar para evitar errores por caracteres especiales
+        raw_esc = escape_filter_chars(username)
+        sam_esc = escape_filter_chars(sam_in)
+        upn_esc = escape_filter_chars(_as_upn(sam_in or username))
+
+        # Cubrimos:
+        # - login con sAMAccountName (user)
+        # - login con UPN (user@dominio)
+        # - login con DOMAIN\\user (se busca por sAMAccountName=user y/o UPN)
         search_filter = (
-            f"(|(sAMAccountName={u_sam})"
-            f"(userPrincipalName={u_sam})"
-            f"(userPrincipalName={u_raw})"
-            f"(userPrincipalName={upn_guess}))"
+            f"(|"
+            f"(sAMAccountName={sam_esc})"
+            f"(sAMAccountName={raw_esc})"
+            f"(userPrincipalName={raw_esc})"
+            f"(userPrincipalName={upn_esc})"
+            f")"
         )
-
         attrs = ["displayName", "mail", "userPrincipalName", "sAMAccountName"]
 
         ok = svc.search(
@@ -119,7 +148,7 @@ def authenticate(username: str, password: str):
             search_filter=search_filter,
             search_scope=SUBTREE,
             attributes=attrs,
-            size_limit=1,
+            size_limit=1
         )
 
         if not ok or not svc.entries:
@@ -128,45 +157,41 @@ def authenticate(username: str, password: str):
 
         entry = svc.entries[0]
         user_dn = entry.entry_dn
+
         display_name = entry.displayName.value if hasattr(entry, "displayName") else ""
         mail = entry.mail.value if hasattr(entry, "mail") else ""
-        upn_value = entry.userPrincipalName.value if hasattr(entry, "userPrincipalName") else ""
-        sam_value = entry.sAMAccountName.value if hasattr(entry, "sAMAccountName") else sam_input
+        sam = entry.sAMAccountName.value if hasattr(entry, "sAMAccountName") else sam_in or username
 
         svc.unbind()
 
-        # 3) Validación de password: intenta bind con DN y UPN (algunos AD prefieren UPN)
-        candidates = []
-        for v in (user_dn, upn_value, _as_upn(sam_value), _as_upn(sam_input)):
-            v = (v or "").strip()
-            if v and v not in candidates:
-                candidates.append(v)
+        # 3) Bind usuario (validación real de password)
+        # IMPORTANTE: auto_bind=True lanza excepción y oculta subcódigos útiles (52e/775/etc.).
+        user_conn = Connection(server, user=user_dn, password=password, auto_bind=False)
+        if not user_conn.bind():
+            result = user_conn.result or {}
+            desc = result.get("description", "")
+            msg = result.get("message", "") or ""
 
-        last_bind_err = None
-        for bind_id in candidates:
-            try:
-                user_conn = Connection(server, user=bind_id, password=password, auto_bind=True)
-                user_conn.unbind()
+            ad_data = _extract_ad_data(msg)
+            ad_hint = _AD_DATA_MAP.get(ad_data, "")
 
-                return True, {
-                    "username": sam_value,  # sAMAccountName
-                    "display_name": display_name or sam_value,
-                    "email": mail or "",
-                    "dn": user_dn,
-                    "upn": upn_value or "",
-                }
+            user_conn.unbind()
+            logger.warning("LDAP bind usuario falló: %s | %s", desc, msg)
+            return False, {
+                "error": "INVALID_CREDENTIALS",
+                "detail": f"{desc} | {msg}",
+                "ad_data": ad_data,
+                "ad_hint": ad_hint,
+            }
 
-            except LDAPBindError as e:
-                # No loguear stack completo en credenciales inválidas (ruido en consola)
-                last_bind_err = str(e)
-                if "invalidCredentials" in last_bind_err:
-                    continue
-                # Otros errores de bind: reportar
-                logger.warning("LDAP bind falló para %s: %s", bind_id, last_bind_err)
-                return False, {"error": "LDAP_ERROR", "detail": last_bind_err}
+        user_conn.unbind()
 
-        # Si llegamos aquí: ninguno funcionó -> credenciales inválidas / cuenta bloqueada
-        return False, {"error": "INVALID_CREDENTIALS", "detail": last_bind_err or "invalidCredentials"}
+        return True, {
+            "username": sam,  # sAMAccountName
+            "display_name": display_name or sam,
+            "email": mail or "",
+            "dn": user_dn
+        }
 
     except Exception as e:
         logger.exception("LDAP authenticate falló")

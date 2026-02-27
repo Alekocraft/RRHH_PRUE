@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Incapacidad médica{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div>
+        <h4 class="mb-2">Incapacidad médica</h4>
+        <p class="text-muted mb-0">Registra tu incapacidad y se enviará a RRHH para aprobación. Tu jefe podrá visualizarla.</p>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('modulos.incapacidad_nueva') }}">Registrar</a>
+        {% if es_jefe or is_backoffice %}
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('modulos.incapacidad_equipo') }}">Ver equipo</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <hr class="my-4" />
+
+    <h6 class="mb-2">Mis registros (últimos 50)</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Inicio</th>
+            <th>Fin</th>
+            <th>Estado</th>
+            <th>Creada</th>
+            <th>Enviada</th>
+            <th>Cerrada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in items %}
+          <tr>
+            <td>#{{ r.request_id }}</td>
+            <td>{{ r.start_date|fecha }}</td>
+            <td>{{ r.end_date|fecha }}</td>
+            <td>{{ r.status|estado }}</td>
+            <td>{{ r.created_at|fecha_hora }}</td>
+            <td>{{ (r.submitted_at or '')|fecha_hora }}</td>
+            <td>{{ (r.closed_at or '')|fecha_hora }}</td>
+          </tr>
+          {% endfor %}
+          {% if not items %}
+          <tr><td colspan="7" class="text-center text-muted">Sin registros</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="btn btn-link p-0" href="{{ url_for('modulos.dashboard') }}">← Volver al dashboard</a>
+  </div>
+</div>
+{% endblock %}

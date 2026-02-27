@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Aprobaciones - Chequera{% endblock %}
+
+{% block head %}
+<style>
+  .card{ background: rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:14px; }
+  .tbl{ width:100%; border-collapse: collapse; }
+  .tbl th, .tbl td{ padding:10px 8px; border-bottom:1px solid rgba(255,255,255,.10); vertical-align: top; }
+  .tbl th{ text-align:left; font-size:12px; letter-spacing:.2px; opacity:.9; }
+  .tag{ display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:800; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.10); }
+  .tag.pending{ border-color: rgba(245,158,11,.35); }
+  .tag.readonly{ border-color: rgba(59,130,246,.35); }
+  textarea{ width:100%; min-height:34px; padding:8px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.15); color:inherit; }
+  button{ padding:9px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: inherit; font-weight:900; cursor:pointer; }
+  button.ok{ background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.35); }
+  button.no{ background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.35); }
+  .actions{ display:flex; gap:8px; align-items:center; }
+  .muted{ opacity:.86; }
+  .stack{ display:flex; flex-direction:column; gap:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <h1>Aprobaciones - Chequera de tiempo</h1>
+
+  <p class="muted">
+    Flujo: el <b>Jefe Directo</b> aprueba las solicitudes de su equipo. <b>RRHH solo visualiza</b>. El <b>Administrador</b>
+    puede <b>aprobar/rechazar siempre</b>. La trazabilidad queda registrada con el usuario que decide.
+  </p>
+
+  <div class="card">
+    {% if not items %}
+      <p class="muted">No hay solicitudes pendientes.</p>
+    {% else %}
+      <table class="tbl" aria-label="Pendientes chequera">
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Fecha</th>
+            <th>Franja</th>
+            <th>Motivo</th>
+            <th>Pendiente de</th>
+            <th style="min-width:320px;">Acciones</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in items %}
+            <tr>
+              <td>
+                <b>{{ (r.first_name or '') }} {{ (r.last_name or '') }}</b>
+                {% if r.doc_number %}<span class="muted">· {{ r.doc_number }}</span>{% endif %}
+                <br/>
+                <span class="muted">{{ r.department or '' }} · {{ r.position_name or '' }}</span>
+              </td>
+              <td>{{ r.request_date }}</td>
+              <td>{{ 'Mañana' if (r.slot|upper) == 'AM' else 'Tarde' }}</td>
+              <td class="muted">{{ r.reason or '' }}</td>
+              <td class="muted">
+                {% if (r.expected_approver or '') == 'Jefe Directo' %}
+                  Jefe Directo{% if r.manager_name %}: {{ r.manager_name }}{% endif %}
+                {% else %}
+                  Administrador
+                {% endif %}
+              </td>
+              <td>
+                {% if r.can_decide %}
+                  <div class="stack">
+                    <form class="actions" method="post" action="{{ url_for('modulos.chequera_aprobar', request_id=r.request_id) }}">
+                      <textarea name="comment" placeholder="Comentario (opcional)"></textarea>
+                      <button class="ok" type="submit">Aprobar</button>
+                    </form>
+                    <form class="actions" method="post" action="{{ url_for('modulos.chequera_rechazar', request_id=r.request_id) }}">
+                      <textarea name="comment" placeholder="Motivo del rechazo (opcional)"></textarea>
+                      <button class="no" type="submit">Rechazar</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="tag readonly">SOLO VISTA</span><br/>
+                  <span class="muted">{{ r.readonly_hint or 'Solo lectura' }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="tag pending">PENDIENTE</span>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+{% endblock %}

@@ -255,6 +255,7 @@ textarea{min-height:90px;resize:vertical}
 /* Flash messages */
 .flash{border-radius:14px;padding:12px 14px;border:1px solid var(--border);background:#fff;box-shadow:var(--shadow);margin:0 0 12px}
 .flash.success{border-color:rgba(16,185,129,.30);background:rgba(16,185,129,.10)}
+.flash.warning{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.12)}
 .flash.error{border-color:rgba(180,35,24,.30);background:rgba(180,35,24,.08)}
 .flash.info{border-color:rgba(0,152,177,.30);background:rgba(0,152,177,.08)}
 .flash .flash-title{font-weight:950;margin:0 0 4px}

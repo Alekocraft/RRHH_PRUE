@@ -3,25 +3,121 @@
 {% block content %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <h4 class="mb-2">Hora flexible (1h)</h4>
-    <p class="text-muted mb-3">AM (llegar 1h tarde) o PM (salir 1h antes) con aprobación.</p>
+    <h4 class="mb-2">Hora flexible (periódica)</h4>
+    <p class="text-muted mb-3">
+      Configura una regla semanal (ej: <strong>todos los lunes</strong>) para llegar 1h tarde (AM) o salir 1h antes (PM),
+      hasta que solicites una modificación.
+    </p>
 
-    <div class="row g-3">
-      <div class="col-12 col-lg-6">
-        <div class="border rounded p-3">
-          <h6>Empleado</h6>
-          <p class="mb-2">Crea una solicitud y se envía al workflow.</p>
-          <a class="btn btn-primary btn-sm" href="{{ url_for('modulos.hora_flexible_nueva') }}">Nueva solicitud</a>
-        </div>
+    {% if open_request_count|int > 0 %}
+      <div class="flash info">
+        <div class="flash-title">Info</div>
+        <p>Ya tienes una solicitud de Hora flexible en curso. No puedes crear otra hasta que se gestione.</p>
       </div>
+    {% endif %}
 
-      <div class="col-12 col-lg-6">
-        <div class="border rounded p-3">
-          <h6>Aprobación</h6>
-          <p class="mb-2">Bandeja de pasos pendientes asignados a tu usuario.</p>
-          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('modulos.aprobaciones') }}">Bandeja</a>
-        </div>
-      </div>
+    <div class="border rounded p-3 mb-3">
+      <h6 class="mb-2">Regla actual</h6>
+      {% if rule %}
+        <div><strong>Día:</strong> {{ weekday_label(rule.weekday) }}</div>
+        <div><strong>Horario:</strong> {{ rule.slot }} ({{ 'llegar 1h tarde' if rule.slot=='AM' else 'salir 1h antes' }})</div>
+        <div><strong>Vigencia:</strong> desde {{ rule.valid_from }}{% if rule.valid_to %} hasta {{ rule.valid_to }}{% endif %}</div>
+      {% else %}
+        <div class="text-muted">No tienes una regla activa.</div>
+      {% endif %}
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      {% if open_request_count|int == 0 %}
+        <a class="btn btn-primary btn-sm" href="{{ url_for('modulos.hora_flexible_nueva') }}">
+          {{ 'Solicitar modificación' if rule else 'Nueva solicitud' }}
+        </a>
+      {% else %}
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('modulos.hora_flexible_nueva') }}" aria-disabled="true" style="pointer-events:none; opacity:.6;">
+          {{ 'Solicitar modificación' if rule else 'Nueva solicitud' }}
+        </a>
+      {% endif %}
+
+      {#
+        Evitar mostrar la bandeja a colaboradores cuando no tienen nada por aprobar.
+        - Backoffice: siempre visible
+        - Jefe: solo si tiene pendientes asignados
+      #}
+      {% if is_backoffice or es_jefe %}
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('modulos.aprobaciones') }}">Bandeja de aprobaciones</a>
+      {% endif %}
+    </div>
+
+    <hr class="my-4" />
+
+    <h6 class="mb-2">Histórico de solicitudes</h6>
+    <p class="text-muted mb-2">Tus solicitudes (últimas {{ req_history|length }}).</p>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Estado</th>
+            <th>Día</th>
+            <th>Horario</th>
+            <th>Vigencia desde</th>
+            <th>Creada</th>
+            <th>Enviada</th>
+            <th>Cerrada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in req_history %}
+            <tr>
+              <td>#{{ r.request_id }}</td>
+              <td>{{ r.status|estado }}</td>
+              <td>{{ weekday_label(r.weekday) if r.weekday else '' }}</td>
+              <td>{{ r.slot or '' }}</td>
+              <td>{{ (r.valid_from or '')|fecha }}</td>
+              <td>{{ r.created_at|fecha_hora }}</td>
+              <td>{{ (r.submitted_at or '')|fecha_hora }}</td>
+              <td>{{ (r.closed_at or '')|fecha_hora }}</td>
+            </tr>
+          {% endfor %}
+          {% if not req_history %}
+            <tr><td colspan="8" class="text-center text-muted">Sin registros</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="my-4" />
+
+    <h6 class="mb-2">Histórico de reglas</h6>
+    <p class="text-muted mb-2">Reglas aplicadas para ti (últimas {{ rule_history|length }}).</p>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Día</th>
+            <th>Horario</th>
+            <th>Vigencia desde</th>
+            <th>Vigencia hasta</th>
+            <th>Creada</th>
+            <th>Solicitud</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for x in rule_history %}
+            <tr>
+              <td>{{ weekday_label(x.weekday) }}</td>
+              <td>{{ x.slot }}</td>
+              <td>{{ x.valid_from|fecha }}</td>
+              <td>{{ (x.valid_to or '')|fecha }}</td>
+              <td>{{ x.created_at|fecha_hora }}</td>
+              <td>{{ x.source_request_id or '' }}</td>
+            </tr>
+          {% endfor %}
+          {% if not rule_history %}
+            <tr><td colspan="6" class="text-center text-muted">Sin registros</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
     </div>
 
     <hr class="my-4" />

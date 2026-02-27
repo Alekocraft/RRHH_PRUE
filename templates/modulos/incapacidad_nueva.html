@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Registrar incapacidad{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Registrar incapacidad médica</h4>
+    <p class="text-muted">Registra el rango de fechas. RRHH aprobará la solicitud.</p>
+
+    <div class="flash info" style="margin-top:12px;">
+      <div class="flash-title">Importante</div>
+      <p>Recuerde enviar el soporte de incapacidad médica directamente al correo de RRHH.</p>
+    </div>
+
+    <form method="post" class="row g-3" style="margin-top:8px;">
+      <div class="col-12 col-lg-4">
+        <label class="form-label">Fecha inicio</label>
+        <input class="form-control" type="date" name="start_date" required>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label">Fecha fin</label>
+        <input class="form-control" type="date" name="end_date" required>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Observación (opcional)</label>
+        <input class="form-control" name="notes" maxlength="300">
+      </div>
+      <div class="col-12" style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary">Enviar</button>
+        <a class="btn btn-link" href="{{ url_for('modulos.incapacidad') }}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Chequera de tiempo{% endblock %}
+
+{% block head %}
+<style>
+  .cheq-wrap{ display:grid; grid-template-columns: 1.2fr 1fr; gap:16px; }
+  @media (max-width: 980px){ .cheq-wrap{ grid-template-columns:1fr; } }
+
+  .card{ background: rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:14px; }
+  .card h2{ margin:0 0 8px 0; font-size:18px; }
+  .muted{ opacity:.8; }
+
+  .progress{ height:14px; background: rgba(255,255,255,.14); border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,.12); }
+  .progress > div{ height:100%; width:0%; background: rgba(34,197,94,.9); border-radius:999px; transition: width .4s ease; }
+  .kpi{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .pill{ padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.12); font-weight:800; font-size:12px; }
+
+  .tbl{ width:100%; border-collapse: collapse; }
+  .tbl th, .tbl td{ padding:10px 8px; border-bottom:1px solid rgba(255,255,255,.10); vertical-align: top; }
+  .tbl th{ text-align:left; font-size:12px; letter-spacing:.2px; opacity:.9; }
+  .tag{ display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:800; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.10); }
+  .tag.pending{ border-color: rgba(245,158,11,.35); }
+  .tag.approved{ border-color: rgba(34,197,94,.35); }
+  .tag.rejected{ border-color: rgba(239,68,68,.35); }
+  .tag.cancelled{ border-color: rgba(148,163,184,.35); }
+
+  .form-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  .form-row > div{ flex:1 1 140px; }
+  input[type="date"], select, input[type="text"]{ width:100%; padding:10px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.15); color: inherit; }
+  button{ padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: inherit; font-weight:900; cursor:pointer; }
+  button.primary{ background: rgba(59,130,246,.25); border-color: rgba(59,130,246,.45); }
+  button.danger{ background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.35); }
+  .actions{ display:flex; gap:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <h1>Chequera de tiempo</h1>
+  <p class="muted">Saldo anual: <b>6 medios días</b> (Mañana o Tarde). El progreso baja automáticamente con cada solicitud <b>aprobada</b>.</p>
+
+  {% if not balance %}
+    <div class="card">
+      <h2>Configuración pendiente</h2>
+      <p class="muted">No se encontró la tabla <code>rrhh.timebook_request</code> en la base de datos.</p>
+    </div>
+  {% else %}
+    <div class="cheq-wrap">
+      <div class="card">
+        <h2>Mi saldo</h2>
+        <div class="progress" aria-label="Progreso de saldo">
+          <div id="bar" style="width: {{ balance.percent }}%"></div>
+        </div>
+        <div class="kpi">
+          <span class="pill">Disponible: {{ balance.remaining }} / {{ balance.total }}</span>
+          <span class="pill">Consumido: {{ balance.approved }} / {{ balance.total }}</span>
+          <span class="pill">Progreso: {{ balance.percent }}%</span>
+        </div>
+
+        <div style="margin-top:10px;">
+          {% if today_shift %}
+            <span class="pill">Turno hoy: {{ today_shift.shift_code }} ({{ today_shift.start_time }} - {{ today_shift.end_time }})</span>
+          {% else %}
+            <span class="pill" style="border-color: rgba(245,158,11,.45); background: rgba(245,158,11,.08);">
+              Sin turno asignado hoy
+            </span>
+            <p class="muted" style="margin:8px 0 0 0;">
+              Para usar la chequera debes tener <b>turno asignado</b> en la fecha seleccionada.
+            </p>
+          {% endif %}
+        </div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,.12); margin:14px 0;" />
+
+        <h2>Solicitar medio día</h2>
+        <form method="post" action="{{ url_for('modulos.chequera_solicitar') }}">
+          <div class="form-row">
+            <div>
+              <label>Fecha</label>
+              <input type="date" name="request_date" required />
+            </div>
+            <div>
+              <label>Franja</label>
+              <select name="slot" required>
+                <option value="AM">Mañana (AM)</option>
+                <option value="PM">Tarde (PM)</option>
+              </select>
+            </div>
+            <div style="flex:2 1 240px;">
+              <label>Motivo (opcional)</label>
+              <input type="text" name="reason" placeholder="Ej: diligencia médica, trámite..." />
+            </div>
+            <div style="flex:0 0 160px;">
+              <button class="primary" type="submit">Enviar solicitud</button>
+            </div>
+          </div>
+        </form>
+
+        <p class="muted" style="margin-top:10px;">
+          <b>Reglas:</b>
+          Si eres <b>jefe</b>, aprueba únicamente <b>RRHH</b>.
+          Si NO eres jefe, aprueba únicamente tu <b>jefe directo</b> (sin intervención de RRHH).
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Mis solicitudes</h2>
+
+        {% if not items %}
+          <p class="muted">Aún no tienes solicitudes registradas.</p>
+        {% else %}
+          <table class="tbl" aria-label="Mis solicitudes de chequera">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Franja</th>
+                <th>Estado</th>
+                <th>Motivo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in items %}
+                {% set st = (r.status or '')|upper %}
+                <tr>
+                  <td>{{ r.request_date }}</td>
+                  <td>{{ 'Mañana' if (r.slot|upper) == 'AM' else 'Tarde' }}</td>
+                  <td>
+                    {% if st == 'PENDING' %}<span class="tag pending">PENDIENTE</span>{% endif %}
+                    {% if st == 'APPROVED' %}<span class="tag approved">APROBADA</span>{% endif %}
+                    {% if st == 'REJECTED' %}<span class="tag rejected">RECHAZADA</span>{% endif %}
+                    {% if st == 'CANCELLED' %}<span class="tag cancelled">CANCELADA</span>{% endif %}
+                  </td>
+                  <td class="muted">{{ r.reason or '' }}</td>
+                  <td>
+                    {% if st == 'PENDING' %}
+                      <form method="post" action="{{ url_for('modulos.chequera_cancelar', request_id=r.request_id) }}">
+                        <button class="danger" type="submit" onclick="return confirm('¿Cancelar esta solicitud?');">Cancelar</button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

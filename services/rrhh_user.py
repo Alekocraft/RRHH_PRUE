@@ -73,6 +73,7 @@ SELECT
       FROM rrhh.hr_employee_manager m
       WHERE m.manager_employee_id = COALESCE(u.employee_id, e.employee_id)
         AND m.is_primary = 1
+        AND m.employee_id <> m.manager_employee_id
         AND m.valid_from <= CAST(GETDATE() AS DATE)
         AND (m.valid_to IS NULL OR m.valid_to >= CAST(GETDATE() AS DATE))
     ) THEN 1

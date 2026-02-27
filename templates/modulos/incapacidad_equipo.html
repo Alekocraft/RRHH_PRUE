@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Incapacidad · Equipo{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Incapacidad médica · Equipo</h4>
+    <p class="text-muted">Vista solo lectura de incapacidades registradas por tu equipo.</p>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Solicitud</th>
+            <th>Empleado</th>
+            <th>Cédula</th>
+            <th>Inicio</th>
+            <th>Fin</th>
+            <th>Estado</th>
+            <th>Enviada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in items %}
+          <tr>
+            <td>#{{ r.request_id }}</td>
+            <td>{{ r.employee_name }}</td>
+            <td>{{ r.doc_number or '' }}</td>
+            <td>{{ r.start_date|fecha }}</td>
+            <td>{{ r.end_date|fecha }}</td>
+            <td>{{ r.status|estado }}</td>
+            <td>{{ r.submitted_at|fecha_hora }}</td>
+          </tr>
+          {% endfor %}
+          {% if not items %}
+          <tr><td colspan="7" class="text-center text-muted">Sin registros</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="btn btn-link p-0" href="{{ url_for('modulos.incapacidad') }}">← Volver</a>
+  </div>
+</div>
+{% endblock %}

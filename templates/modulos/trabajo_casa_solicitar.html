@@ -64,12 +64,12 @@
               <td>{{ r.work_date }}</td>
               <td>{{ r.reason }}</td>
               <td>
-                {% if st == 'APROBADO' %}
-                  <span class="badge-ok">Aprobado</span>
-                {% elif st == 'RECHAZADO' %}
-                  <span class="badge-danger">Rechazado</span>
+                {% if st in ['APPROVED','APROBADO','APROBADA'] %}
+                  <span class="badge-ok">{{ r.status|estado }}</span>
+                {% elif st in ['REJECTED','RECHAZADO','RECHAZADA'] %}
+                  <span class="badge-danger">{{ r.status|estado }}</span>
                 {% else %}
-                  <span class="badge-warn">Pendiente</span>
+                  <span class="badge-warn">{{ r.status|estado if r.status else 'Pendiente' }}</span>
                 {% endif %}
               </td>
               <td class="small">{{ r.updated_at or '' }}</td>
