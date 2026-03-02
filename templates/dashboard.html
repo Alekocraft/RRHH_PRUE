@@ -3,10 +3,12 @@
 
 {% block content %}
   {#
-    Nota: el dashboard decide qué módulos mostrar con current_user/roles.
-    - pending_aprobaciones_count: pendientes de Trabajo en casa
-    - pending_workflow_count: pendientes de workflows (Hora flexible)
-    - pending_chequera_count: pendientes de Chequera
+    Dashboard RRHH
+    Variables esperadas desde backend:
+      - pending_aprobaciones_count : pendientes Trabajo en casa
+      - pending_workflow_count     : pendientes Hora flexible (workflow)
+      - pending_chequera_count     : pendientes Chequera
+      - my_recent_requests         : lista de solicitudes recientes del usuario
   #}
 
   {% set roles = (current_user.roles|default([])) or [] %}
@@ -31,13 +33,13 @@
 
   <div class="grid">
 
-    {# 1) SOLICITUDES (todos) #}
+    {# 1) SOLICITUDES #}
     <div class="col-12">
       <div class="card" style="padding:14px 16px;">
         <div class="card-header" style="margin-bottom:10px;">
           <div>
             <h2 class="card-title" style="margin:0;">Solicitudes</h2>
-            <p class="card-subtitle">Crea y consulta tus solicitudes. Como empleado, solo ves lo tuyo.</p>
+            <p class="card-subtitle">Crea y consulta tus solicitudes.</p>
           </div>
         </div>
 
@@ -106,52 +108,7 @@
       </div>
     </div>
 
-
-    {# Mis solicitudes recientes (todos) #}
-    {% set mis = (my_recent_requests|default([])) %}
-    {% if mis and (mis|length) > 0 %}
-      <div class="col-12">
-        <div class="card" style="padding:14px 16px;">
-          <div class="card-header" style="margin-bottom:10px;">
-            <div>
-              <h2 class="card-title" style="margin:0;">Mis solicitudes recientes</h2>
-              <p class="card-subtitle">Aquí ves lo que te han aprobado/rechazado y lo que sigue pendiente.</p>
-            </div>
-          </div>
-
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered bg-white align-middle">
-              <thead>
-                <tr>
-                  <th>Módulo</th>
-                  <th>Solicitud</th>
-                  <th>Estado</th>
-                  <th>Creada</th>
-                  <th>Cerrada</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for r in mis %}
-                  <tr>
-                    <td>{{ r.module }}</td>
-                    <td>
-                      {% if r.request_id %}#{{ r.request_id }}{% elif r.work_date %}{{ r.work_date|fecha }}{% else %}-{% endif %}
-                    </td>
-                    <td>{{ (r.status or "")|estado }}</td>
-                    <td>{{ (r.created_at or "")|fecha_hora }}</td>
-                    <td>{{ (r.closed_at or r.submitted_at or "")|fecha_hora }}</td>
-                    <td><a class="btn btn-sm btn-ghost" href="{{ r.url }}">Ver</a></td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    {% endif %}
-
-    {# 2) APROBACIONES (solo jefes, RRHH, admin) #}
+    {# 2) APROBACIONES #}
     {% if ver_aprobaciones %}
       <div class="col-12">
         <div class="card" style="padding:14px 16px;">
@@ -254,8 +211,7 @@
       </div>
     {% endif %}
 
-
-    {# 3) GESTIÓN RRHH (solo RRHH, admin) #}
+    {# 3) GESTIÓN RRHH #}
     {% if ver_gestion_rrhh %}
       <div class="col-12">
         <div class="card" style="padding:14px 16px;">
@@ -313,6 +269,62 @@
         </div>
       </div>
     {% endif %}
+
+    {# 4) MIS SOLICITUDES RECIENTES (al final) #}
+    {% set mis = (my_recent_requests|default([])) %}
+    <div class="col-12">
+      <div class="card" style="padding:14px 16px;">
+        <div class="card-header" style="margin-bottom:10px;">
+          <div>
+            <h2 class="card-title" style="margin:0;">Mis solicitudes recientes</h2>
+            <p class="card-subtitle">Histórico de lo pendiente y lo cerrado.</p>
+          </div>
+        </div>
+
+        {% if mis and (mis|length) > 0 %}
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered bg-white align-middle">
+              <thead>
+                <tr>
+                  <th>Módulo</th>
+                  <th>Solicitud</th>
+                  <th>Estado</th>
+                  <th>Creada</th>
+                  <th>Cerrada</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in mis %}
+                  <tr>
+                    <td>{{ r.module or '-' }}</td>
+                    <td>
+                      {% if r.request_id %}#{{ r.request_id }}
+                      {% elif r.work_date %}{{ r.work_date }}
+                      {% else %}-{% endif %}
+                    </td>
+                    <td>{{ r.status or '-' }}</td>
+                    <td>{{ r.created_at or '-' }}</td>
+                    <td>{{ r.closed_at or r.submitted_at or '-' }}</td>
+                    <td>
+                      {% if r.url %}
+                        <a class="btn btn-sm btn-ghost" href="{{ r.url }}">Ver</a>
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-info" style="margin:0;">
+            No tienes solicitudes recientes para mostrar.
+          </div>
+        {% endif %}
+      </div>
+    </div>
 
   </div>
 {% endblock %}
