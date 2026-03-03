@@ -67,6 +67,16 @@
           <input class="input" id="position_name" name="position_name"
                  value="{{ (form.get('position_name') if form else '') or '' }}">
         </div>
+
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Fecha de cumpleaños <span style="color:red;">*</span></label>
+          <input class="input" type="date" id="birth_date" name="birth_date" required
+                 value="{{ (form.get('birth_date') if form else '') or '' }}">
+          <div class="small" style="margin-top:6px; color:var(--muted);">
+            Se usa para el beneficio del <b>día de cumpleaños</b> (Chequera de tiempo).
+          </div>
+        </div>
+
         <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
           <label class="label">Jefe inmediato (asignación)</label>
           <select class="input" id="manager_employee_id" name="manager_employee_id">
@@ -120,6 +130,7 @@
             <li data-check="ad"><span class="mark">•</span> Usuario (*)</li>
             <li data-check="doc"><span class="mark">•</span> Cédula (*)</li>
             <li data-check="name"><span class="mark">•</span> Nombres y apellidos (*)</li>
+            <li data-check="bday"><span class="mark">•</span> Cumpleaños (*)</li>
             <li data-check="mgr"><span class="mark">•</span> Jefe (recomendado) </li>
           </ul>
           <div class="small" style="margin-top:10px;">
@@ -163,33 +174,47 @@
     setOk('ad', ($('ad_username').value || '').trim().length > 0);
     setOk('name', ($('first_name').value || '').trim().length > 0 && ($('last_name').value || '').trim().length > 0);
     setOk('doc', ($('doc_number').value || '').trim().length > 0);
+    setOk('bday', ($('birth_date').value || '').trim().length > 0);
     setOk('mgr', ($('manager_employee_id').value || '').trim().length > 0);
+  }
+
+  function emptyNode(node){
+    while(node.firstChild) node.removeChild(node.firstChild);
   }
 
   function clearSuggestions(){
     box.style.display = 'none';
-    box.innerHTML = '';
+    emptyNode(box);
   }
 
   function renderItem(it){
-    const div = document.createElement('div');
-    div.style.padding = '10px 12px';
-    div.style.cursor = 'pointer';
-    div.style.borderTop = '1px solid rgba(2,6,23,.08)';
-    const dn = onlyDigits(it.doc_number);
+  const div = document.createElement('div');
+  div.style.padding = '10px 12px';
+  div.style.cursor = 'pointer';
+  div.style.borderTop = '1px solid rgba(2,6,23,.08)';
 
-    div.innerHTML = `
-      <div style="font-weight:700;">${it.display_name || ((it.first_name||'')+' '+(it.last_name||'')).trim()}</div>
-      <div style="font-size:12px; color:var(--muted); margin-top:3px;">
-        <span>${it.sam || ''}</span>
-        ${dn ? ' · <span>Cédula: '+dn+'</span>' : ''}
-        ${it.department ? ' · <span>'+it.department+'</span>' : ''}
-        ${it.title ? ' · <span>'+it.title+'</span>' : ''}
-      </div>
-    `;
-    div.addEventListener('click', ()=>selectItem(it));
-    return div;
-  }
+  const title = document.createElement('div');
+  title.style.fontWeight = '700';
+  title.textContent = it.display_name || ((it.first_name||'')+' '+(it.last_name||'')).trim();
+  div.appendChild(title);
+
+  const meta = document.createElement('div');
+  meta.style.fontSize = '12px';
+  meta.style.color = 'var(--muted)';
+  meta.style.marginTop = '3px';
+
+  const dn = onlyDigits(it.doc_number);
+  const parts = [];
+  if(it.sam) parts.push(it.sam);
+  if(dn) parts.push('Cédula: ' + dn);
+  if(it.department) parts.push(it.department);
+  if(it.title) parts.push(it.title);
+  meta.textContent = parts.join(' · ');
+  div.appendChild(meta);
+
+  div.addEventListener('click', ()=>selectItem(it));
+  return div;
+}
 
   function selectItem(it){
     $('ad_username').value = it.sam || '';
@@ -204,7 +229,13 @@
       const opts = Array.from($('manager_employee_id').options);
       const match = opts.find(o => (o.dataset && o.dataset.sam || '').toLowerCase() === String(it.manager_sam).toLowerCase());
       if(match){ $('manager_employee_id').value = match.value; }
-      $('managerHint').innerHTML = 'Jefe detectado en AD: <b>' + it.manager_sam + '</b> (si existe en el portal se preselecciona).';
+      const hint = $('managerHint');
+      emptyNode(hint);
+      hint.appendChild(document.createTextNode('Jefe detectado en AD: '));
+      const b = document.createElement('b');
+      b.textContent = String(it.manager_sam || '');
+      hint.appendChild(b);
+      hint.appendChild(document.createTextNode(' (si existe en el portal se preselecciona).'));
     } else {
       $('managerHint').textContent = '';
     }
@@ -220,7 +251,7 @@
       const res = await fetch('{{ url_for("admin_rrhh.ldap_search") }}?q=' + encodeURIComponent(q));
       const data = await res.json();
       const items = data.items || [];
-      box.innerHTML = '';
+      emptyNode(box);
       if(items.length === 0){
         const empty = document.createElement('div');
         empty.style.padding = '10px 12px';

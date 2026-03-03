@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Vacaciones{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Vacaciones</h4>
+    <p class="text-muted mb-3">
+      Solicita tu periodo de vacaciones. La solicitud se aprueba en <strong>2 pasos</strong>:
+      <strong>Jefe directo</strong> → <strong>RRHH</strong>. También puedes incluir días <strong>pagos</strong> (no mayores a los de disfrute).
+    </p>
+
+    {% if not ready %}
+      <div class="flash warning">
+        <div class="flash-title">Configuración pendiente</div>
+        <p>No se encontró configuración de Vacaciones en la base de datos. RRHH/Admin debe ejecutar el patch SQL.</p>
+      </div>
+    {% endif %}
+
+    <div class="border rounded p-3 mb-3">
+      <h6 class="mb-2">Mi saldo</h6>
+
+      {% if balance %}
+        <div style="display:flex; gap:18px; flex-wrap:wrap;">
+          <div><strong>Disponible:</strong> {{ balance.available }}</div>
+          <div><strong>Gastado:</strong> {{ balance.used }}</div>
+          <div><strong>Total (ref):</strong> {{ balance.total }}</div>
+          <div class="text-muted"><strong>Actualizado:</strong> {{ (balance.updated_at or '')|fecha_hora }}</div>
+        </div>
+        {% if balance.as_of_date %}
+          <div class="text-muted mt-1">Corte del archivo: {{ balance.as_of_date|fecha }}</div>
+        {% endif %}
+      {% else %}
+        <div class="text-muted">No hay saldo cargado para ti. RRHH debe cargar el <strong>Libro de Vacaciones</strong>.</div>
+      {% endif %}
+
+      {% if (current_user.es_rrhh|default(false)) or ('RRHH' in (current_user.roles|default([]))) or ('ADMINISTRADOR' in (current_user.roles|default([]))) %}
+        <div class="mt-2">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('modulos.vacaciones_cargar') }}">Cargar/Actualizar saldo (RRHH/Admin)</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="border rounded p-3 mb-3">
+      <h6 class="mb-2">Solicitar vacaciones</h6>
+
+      {% if not balance %}
+        <div class="flash info">
+          <div class="flash-title">Info</div>
+          <p>Cuando RRHH cargue tu saldo, podrás solicitar vacaciones desde aquí.</p>
+        </div>
+      {% elif balance.available|float <= 0 %}
+        <div class="flash warning">
+          <div class="flash-title">Sin saldo</div>
+          <p>No tienes días disponibles para solicitar.</p>
+        </div>
+      {% else %}
+        <form method="post" action="{{ url_for('modulos.vacaciones_solicitar') }}">
+          <div class="form-row">
+            <div style="min-width:180px; flex:0 0 auto;">
+              <label>Inicio</label>
+              <input type="date" name="start_date" required>
+            </div>
+            <div style="min-width:180px; flex:0 0 auto;">
+              <label>Fin</label>
+              <input type="date" name="end_date" required>
+            </div>
+            <div style="min-width:160px; flex:0 0 auto;">
+              <label>Días pagas</label>
+              <input type="number" name="days_paid" min="0" step="1" value="0">
+              <div class="text-muted" style="font-size:12px; margin-top:4px;">No pueden superar los días de disfrute.</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="suggestions" style="flex:1; min-width:260px;">
+              <label>Motivo / comentario (opcional)</label>
+              <input type="text" name="notes" placeholder="Ej: viaje, diligencia personal...">
+            </div>
+          </div>
+
+          <div class="mt-16" style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn" type="submit">Enviar solicitud</button>
+            <a class="btn btn-secondary" href="{{ url_for('modulos.vacaciones') }}">Limpiar</a>
+          </div>
+
+          <div class="small mt-16">
+            <strong>Reglas:</strong>
+            <ul style="margin:8px 0 0; padding-left:18px;">
+              <li>El sistema calcula <strong>días hábiles</strong> (Lun–Vie) y descuenta festivos activos.</li>
+              <li><strong>Días pagas ≤ días de disfrute</strong> del periodo.</li>
+              <li><strong>Total (disfrute + pagas)</strong> no puede superar tu saldo disponible.</li>
+            </ul>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+
+    <hr class="my-4" />
+
+    <h6 class="mb-2">Mis solicitudes</h6>
+    <p class="text-muted mb-2">Últimas {{ requests|length }}.</p>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Periodo</th>
+            <th>Disfrute</th>
+            <th>Pagas</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th>Creada</th>
+            <th>Enviada</th>
+            <th>Cerrada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in requests %}
+            <tr>
+              <td>#{{ r.request_id }}</td>
+              <td>{{ r.start_date|fecha }} → {{ r.end_date|fecha }}</td>
+              <td>{{ r.days_enjoyed }}</td>
+              <td>{{ r.days_paid }}</td>
+              <td>{{ r.days_total }}</td>
+              <td>{{ r.status|estado }}</td>
+              <td>{{ r.created_at|fecha_hora }}</td>
+              <td>{{ (r.submitted_at or '')|fecha_hora }}</td>
+              <td>{{ (r.closed_at or '')|fecha_hora }}</td>
+            </tr>
+          {% endfor %}
+          {% if not requests %}
+            <tr><td colspan="9" class="text-center text-muted">Sin registros</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="btn btn-link p-0" href="{{ url_for('modulos.dashboard') }}">← Volver al dashboard</a>
+  </div>
+</div>
+{% endblock %}

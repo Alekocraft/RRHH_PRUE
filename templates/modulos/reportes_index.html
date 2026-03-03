@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Reportes · RRHH{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Reportes</h1>
+      <p>Exporta información en PDF o Excel con filtros y control de acceso por rol.</p>
+    </div>
+  </div>
+
+  <div class="card" style="padding:14px 16px;">
+    <div class="grid" style="gap:12px;">
+      {% for r in reports %}
+        <div class="col-4">
+          <div class="card" style="box-shadow:none;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title" style="font-size:16px;">{{ r.title.replace('Reporte · ', '') }}</h3>
+                <p class="card-subtitle">Vista segura según tu perfil.</p>
+              </div>
+            </div>
+            <div class="card-body" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <a class="btn btn-primary" href="{{ url_for('modulos.reportes_detalle', slug=r.slug) }}">Abrir</a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="alert alert-info" style="margin-top:12px;">
+      <strong>Reglas de acceso:</strong>
+      <ul style="margin:8px 0 0 18px;">
+        <li><strong>Empleado:</strong> solo ve lo suyo.</li>
+        <li><strong>Jefe:</strong> ve lo suyo y lo de su equipo.</li>
+        <li><strong>RRHH/Administrador:</strong> ve todo.</li>
+      </ul>
+    </div>
+  </div>
+{% endblock %}

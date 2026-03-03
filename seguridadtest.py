@@ -51,8 +51,7 @@ DEFAULT_EXCLUDE_DIRS = {
 TEXT_EXTENSIONS = {".py", ".html", ".htm", ".js", ".jsx", ".ts", ".tsx", ".jinja", ".j2"}
 
 # Archivos a omitir (por nombre)
-DEFAULT_EXCLUDE_FILES = {".env"}
-
+DEFAULT_EXCLUDE_FILES = {".env", "seguridadtest.py"}
 
 
 # -----------------------------

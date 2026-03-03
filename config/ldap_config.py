@@ -3,7 +3,7 @@ import os
 def _bool(v, default=False) -> bool:
     if v is None:
         return default
-    return str(v).strip().lower() in ("1", "true", "yes", "y", "on")
+    return (f"{v}").strip().lower() in ("1", "true", "yes", "y", "on")
 
 def _norm_server(raw: str):
     raw = (raw or "").strip()

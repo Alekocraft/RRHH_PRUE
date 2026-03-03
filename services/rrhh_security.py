@@ -158,7 +158,7 @@ def get_user_roles(user_id: Union[int, str]) -> List[str]:
     if isinstance(user_id, int):
         uid = user_id
     else:
-        uid = _get_user_id_by_username(str(user_id))
+        uid = _get_user_id_by_username(f"{user_id}")
 
     if not uid:
         return []

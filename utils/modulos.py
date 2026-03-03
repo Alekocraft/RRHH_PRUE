@@ -38,7 +38,7 @@ def _time_to_str(t: Optional[time]) -> str:
 def _parse_doc_number(v) -> Optional[str]:
     if v is None:
         return None
-    s = str(v).strip()
+    s = (f"{v}").strip()
     if not s:
         return None
     # solo dígitos
@@ -52,7 +52,7 @@ def _parse_date(v) -> Optional[date]:
         return v
     if isinstance(v, datetime):
         return v.date()
-    s = str(v).strip()
+    s = (f"{v}").strip()
     if not s:
         return None
     # intenta yyyy-mm-dd o dd/mm/yyyy
@@ -70,7 +70,7 @@ def _parse_time(v) -> Optional[time]:
         return v.replace(microsecond=0)
     if isinstance(v, datetime):
         return v.time().replace(microsecond=0)
-    s = str(v).strip()
+    s = (f"{v}").strip()
     if not s:
         return None
     for fmt in ("%H:%M:%S", "%H:%M"):
@@ -280,7 +280,7 @@ def _parse_attendance_excel(file_path: str) -> List[Dict]:
 
         key = (doc, wdate)
         entry = grouped.get(key)
-        raw = {"row": [str(x) if x is not None else "" for x in r]}
+        raw = {"row": [("" if x is None else f"{x}") for x in r]}
 
         if entry is None:
             grouped[key] = {

@@ -23,7 +23,7 @@ def _weekday_label(wd: int) -> str:
         5: "Viernes",
         6: "Sábado",
         7: "Domingo",
-    }.get(int(wd), str(wd))
+    }.get(int(wd), f"{wd}")
 
 
 def _flex_tables_exist() -> bool:
@@ -64,33 +64,6 @@ def _count_open_flex_requests(employee_id: int) -> int:
         "FROM rrhh.wf_request "
         "WHERE employee_id=? AND request_type=? AND status IN ('DRAFT','SUBMITTED')",
         (int(employee_id), REQUEST_TYPE_HORA_FLEXIBLE),
-    )
-    return int(getattr(row, "c", 0) or 0) if row else 0
-
-
-def _count_pending_my_steps(user_id: int) -> int:
-    """Cuenta pendientes de workflow asignados al usuario (solo paso activo actual).
-
-    Se usa para ocultar la opción de bandeja cuando no hay nada por gestionar,
-    evitando que un colaborador entre a una bandeja vacía.
-    """
-    if not user_id:
-        return 0
-
-    row = fetch_one(
-        "SELECT COUNT(1) AS c "
-        "FROM rrhh.wf_request_step s "
-        "JOIN rrhh.wf_request r ON r.request_id = s.request_id "
-        "WHERE r.request_type=? "
-        "  AND r.status='SUBMITTED' "
-        "  AND s.status='PENDING' "
-        "  AND s.assigned_to_user_id=? "
-        "  AND s.step_no = ("
-        "    SELECT MIN(s2.step_no) "
-        "    FROM rrhh.wf_request_step s2 "
-        "    WHERE s2.request_id = s.request_id AND s2.status='PENDING'"
-        "  )",
-        (REQUEST_TYPE_HORA_FLEXIBLE, int(user_id)),
     )
     return int(getattr(row, "c", 0) or 0) if row else 0
 
@@ -162,11 +135,6 @@ def hora_flexible():
     employee_id = int(employee_id)
     rule = _get_active_flex_rule(employee_id)
     open_count = _count_open_flex_requests(employee_id)
-    pending_my_steps = 0
-    try:
-        pending_my_steps = _count_pending_my_steps(int(current_user.user_id))
-    except Exception:
-        pending_my_steps = 0
 
     req_history = []
     rule_history = []
@@ -206,8 +174,7 @@ def hora_flexible():
         req_history=req_history or [],
         rule_history=rule_history or [],
         is_backoffice=_is_admin_or_rrhh(),
-        es_jefe=bool(getattr(current_user, "es_jefe", False) or getattr(current_user, "is_manager", False)),
-        pending_my_steps=pending_my_steps,
+        es_jefe=bool(getattr(current_user, "es_jefe", False)),
     )
 
 
@@ -369,11 +336,6 @@ def aprobaciones():
 
     base_sql += " ORDER BY r.created_at DESC"
     steps = fetch_all(base_sql, tuple(params))
-
-    # Si NO es backoffice y no tiene pendientes asignados, no mostramos bandeja vacía.
-    if (not is_backoffice) and (not steps):
-        flash("No tienes solicitudes pendientes asignadas para aprobar.", "info")
-        return redirect(url_for("modulos.dashboard"))
 
     requests = []
     if is_backoffice:

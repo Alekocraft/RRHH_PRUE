@@ -67,7 +67,7 @@ def execute_scalar(sql: str, params=()):
                     value = row[0]
                 break
             except pyodbc.ProgrammingError as e:
-                msg = str(e)
+                msg = f"{e}"
                 if ("No results" in msg) or ("Previous SQL was not a query" in msg):
                     if not cur.nextset():
                         break

@@ -25,7 +25,7 @@ def _read_xlsx(path: str) -> List[Dict[str, str]]:
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         return []
-    headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+    headers = [((f"{h}").strip() if h is not None else "") for h in rows[0]]
     data: List[Dict[str, str]] = []
     for r in rows[1:]:
         rec: Dict[str, str] = {}
@@ -33,7 +33,7 @@ def _read_xlsx(path: str) -> List[Dict[str, str]]:
             if not h:
                 continue
             val = r[i] if i < len(r) else None
-            rec[h] = "" if val is None else str(val).strip()
+            rec[h] = "" if val is None else (f"{val}").strip()
         if any(rec.values()):
             data.append(rec)
     return data

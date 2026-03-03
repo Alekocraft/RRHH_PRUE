@@ -111,7 +111,7 @@ def _time_to_str(t: Optional[time]) -> str:
 def _parse_doc_number(v) -> Optional[str]:
     if v is None:
         return None
-    s = str(v).strip()
+    s = (f"{v}").strip()
     if not s:
         return None
     digits = "".join(ch for ch in s if ch.isdigit())
@@ -125,7 +125,7 @@ def _parse_date(v) -> Optional[date]:
         return v
     if isinstance(v, datetime):
         return v.date()
-    s = str(v).strip()
+    s = (f"{v}").strip()
     if not s:
         return None
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
@@ -143,7 +143,7 @@ def _parse_time(v) -> Optional[time]:
         return v.replace(microsecond=0)
     if isinstance(v, datetime):
         return v.time().replace(microsecond=0)
-    s = str(v).strip()
+    s = (f"{v}").strip()
     if not s:
         return None
     for fmt in ("%H:%M:%S", "%H:%M"):

@@ -1,0 +1,17 @@
+SECURITY VALIDATION REPORT
+================================================================================
+Root: C:\Users\sinventarios\source\repos\rrhh_prue
+Total findings: 1
+
+Resumen por regla:
+  -   1  CWE-209: Avoid sensitive information exposure through error messages
+
+Resumen por archivo (top 20):
+  -   1  blueprints/modulos_vacaciones.py
+
+Detalle:
+--------------------------------------------------------------------------------
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_vacaciones.py:344
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0344:                 return float(str(v).strip().replace(",", "."))

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>{{ title.replace('Reporte · ', '') }}</h1>
+      <p>Filtros y exportación segura (PDF/Excel).</p>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn btn-sm btn-ghost" href="{{ url_for('modulos.reportes_index') }}">Volver</a>
+    </div>
+  </div>
+
+  <div class="card" style="padding:14px 16px;">
+    <form method="get" action="{{ url_for('modulos.reportes_detalle', slug=slug) }}" class="grid" style="gap:12px; align-items:end;">
+      <div class="col-3">
+        <label class="label">Desde</label>
+        <input class="input" type="date" name="desde" value="{{ desde.isoformat() }}" />
+      </div>
+      <div class="col-3">
+        <label class="label">Hasta</label>
+        <input class="input" type="date" name="hasta" value="{{ hasta.isoformat() }}" />
+      </div>
+
+      <div class="col-3">
+        <label class="label">Alcance</label>
+        <select class="input" name="scope">
+          {% if 'mine' in allowed_scopes %}
+            <option value="mine" {{ 'selected' if scope=='mine' else '' }}>Solo lo mío</option>
+          {% endif %}
+          {% if 'team' in allowed_scopes %}
+            <option value="team" {{ 'selected' if scope=='team' else '' }}>Mi equipo</option>
+          {% endif %}
+          {% if 'all' in allowed_scopes %}
+            <option value="all" {{ 'selected' if scope=='all' else '' }}>Todos</option>
+          {% endif %}
+        </select>
+      </div>
+
+      <div class="col-3">
+        <label class="label">Estado</label>
+        <input class="input" type="text" name="status" value="{{ status }}" placeholder="ALL / PENDING / APPROVED / REJECTED ..." />
+        <small class="text-muted">Tip: usa <b>ALL</b> para todos. Ej: Pendiente (PENDING), Aprobada (APPROVED), Rechazada (REJECTED). En Trabajo en casa: PENDING/APPROVED.</small>
+      </div>
+
+      {% if is_admin or is_rrhh %}
+        <div class="col-3">
+          <label class="label">Cédula (opcional)</label>
+          <input class="input" type="text" name="doc" value="{{ doc }}" placeholder="1022963176" />
+        </div>
+      {% endif %}
+
+      <div class="col-3" style="display:flex; gap:10px;">
+        <button class="btn btn-primary" type="submit">Aplicar filtros</button>
+      </div>
+    </form>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:12px; flex-wrap:wrap;">
+      <div>
+        <span class="badge">Filas: {{ row_count }}</span>
+        {% if row_count > 500 %}
+          <span class="badge badge-warn">Vista previa limitada a 500</span>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:10px;">
+        <a class="btn btn-secondary" href="{{ url_for('modulos.reportes_export', slug=slug, fmt='excel', **export_qs) }}">Exportar Excel</a>
+        <a class="btn btn-secondary" href="{{ url_for('modulos.reportes_export', slug=slug, fmt='pdf', **export_qs) }}">Exportar PDF</a>
+      </div>
+    </div>
+
+    <hr style="margin:14px 0; opacity:.25;" />
+
+    {% if headers and rows %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered bg-white align-middle">
+          <thead>
+            <tr>
+              {% for h in headers %}
+                <th>{{ h }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                {% for c in r %}
+                  <td>{{ (c or '')|estado }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-info" style="margin:0;">Sin resultados para los filtros seleccionados.</div>
+    {% endif %}
+
+    <div class="alert alert-info" style="margin-top:12px;">
+      <strong>Seguridad:</strong>
+      <ul style="margin:8px 0 0 18px;">
+        <li>Empleado: solo ve lo suyo.</li>
+        <li>Jefe: ve lo suyo y su equipo (vigencia por fecha).</li>
+        <li>RRHH/Administrador: ve todo.</li>
+      </ul>
+    </div>
+  </div>
+{% endblock %}

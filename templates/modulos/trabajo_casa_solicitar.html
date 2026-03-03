@@ -17,7 +17,7 @@
     <div class="card-header">
       <div>
         <h2 class="card-title">Nueva solicitud</h2>
-        <p class="card-subtitle">Selecciona la fecha y describe el motivo.</p>
+        <p class="card-subtitle">Selecciona la fecha. Motivo por defecto: <b>Trabajo en casa</b>.</p>
       </div>
     </div>
 
@@ -26,10 +26,6 @@
         <div style="min-width:220px;flex:0 0 auto;">
           <label>Fecha</label>
           <input type="date" name="work_date" value="{{ today }}" required>
-        </div>
-        <div style="flex:2;min-width:320px;">
-          <label>Motivo</label>
-          <input type="text" name="reason" maxlength="250" placeholder="Ej: Visita técnica / mantenimiento / ..." required>
         </div>
       </div>
 

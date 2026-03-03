@@ -1,0 +1,6 @@
+SECURITY VALIDATION REPORT
+================================================================================
+Root: C:\Users\sinventarios\source\repos\rrhh_prue
+Total findings: 0
+
+OK: No se encontraron hallazgos.

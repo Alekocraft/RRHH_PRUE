@@ -14,6 +14,20 @@ from config.ldap_config import (
 logger = logging.getLogger(__name__)
 
 
+def sanitizar_log_text(v: object, max_len: int = 200) -> str:
+    """Sanitiza texto para logs (evita CRLF / control chars y recorta longitud)."""
+    s = "" if v is None else f"{v}"
+    s = s.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    s = "".join(ch if ch.isprintable() else " " for ch in s)
+    s = re.sub(r"\s+", " ", s).strip()
+    if len(s) > max_len:
+        s = s[:max_len] + "…"
+    # Redacción básica de posibles secretos (si aparecen en mensajes de AD)
+    s = re.sub(r"(?i)(password|passwd|pwd)\s*[:=]\s*\S+", r"\1=***", s)
+    return s
+
+
+
 # Sub-códigos típicos devueltos por Active Directory en el mensaje de error ("data 52e", etc.)
 _AD_DATA_MAP = {
     "525": "Usuario no encontrado",
@@ -87,8 +101,9 @@ def test_connection():
         conn.unbind()
         return True, "OK"
     except Exception as e:
-        logger.exception("LDAP test_connection falló")
-        return False, str(e)
+        logger.warning("Conexión de autenticación corporativa no disponible")
+        logger.debug("Detalle conexión autenticación corporativa: %s", sanitizar_log_text(e))
+        return False, "LDAP_CONNECT_ERROR"
 
 
 def authenticate(username: str, password: str):
@@ -176,10 +191,11 @@ def authenticate(username: str, password: str):
             ad_hint = _AD_DATA_MAP.get(ad_data, "")
 
             user_conn.unbind()
-            logger.warning("LDAP bind usuario falló: %s | %s", desc, msg)
+            logger.warning("Autenticación de usuario falló")
+            logger.debug("Detalle autenticación de usuario: %s | %s", sanitizar_log_text(desc), sanitizar_log_text(msg))
             return False, {
                 "error": "INVALID_CREDENTIALS",
-                "detail": f"{desc} | {msg}",
+                "detail": "Credenciales inválidas",
                 "ad_data": ad_data,
                 "ad_hint": ad_hint,
             }
@@ -194,5 +210,6 @@ def authenticate(username: str, password: str):
         }
 
     except Exception as e:
-        logger.exception("LDAP authenticate falló")
-        return False, {"error": "LDAP_ERROR", "detail": str(e)}
+        logger.error("Autenticación corporativa falló")
+        logger.debug("Detalle autenticación corporativa: %s", sanitizar_log_text(e))
+        return False, {"error": "LDAP_ERROR"}

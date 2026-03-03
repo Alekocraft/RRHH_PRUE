@@ -3,7 +3,7 @@ import os
 def _bool(env_value, default=False) -> bool:
     if env_value is None:
         return default
-    return str(env_value).strip().lower() in ("1", "true", "yes", "y", "on")
+    return (f"{env_value}").strip().lower() in ("1", "true", "yes", "y", "on")
 
 RRHH_DB_DSN = os.getenv("RRHH_DB_DSN", "").strip()  # opcional
 

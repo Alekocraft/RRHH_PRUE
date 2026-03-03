@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import logging
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
@@ -16,6 +17,8 @@ from services.ldap_directory import search_users, get_user_by_sam
 from services.rrhh_security import ROLE_ADMIN, ROLE_RRHH
 
 admin_rrhh_bp = Blueprint("admin_rrhh", __name__, url_prefix="/admin")
+
+logger = logging.getLogger(__name__)
 
 
 def _require_admin() -> bool:
@@ -109,6 +112,19 @@ def empleado_nuevo():
         form_data = dict(request.form)
         cur_mgr_id = manager_employee_id
 
+        birth_date_raw = (request.form.get("birth_date") or "").strip()
+        birth_date = None
+        if birth_date_raw:
+            try:
+                birth_date = datetime.strptime(birth_date_raw, "%Y-%m-%d").date()
+            except Exception:
+                flash("Fecha de cumpleaños inválida. Usa el selector de fecha.", "warning")
+                return render_template("admin/empleado_nuevo.html", managers=managers, form=form_data, cur_mgr_id=cur_mgr_id)
+        else:
+            flash("Debes ingresar la fecha de cumpleaños.", "warning")
+            return render_template("admin/empleado_nuevo.html", managers=managers, form=form_data, cur_mgr_id=cur_mgr_id)
+
+
         if not sam:
             flash("Debes seleccionar un usuario de AD (samAccountName).", "warning")
             return render_template("admin/empleado_nuevo.html", managers=managers, form=form_data, cur_mgr_id=cur_mgr_id)
@@ -128,6 +144,7 @@ def empleado_nuevo():
                 position_name=position_name,
                 is_exec_approval_by_hr=is_exec_approval_by_hr,
                 can_work_from_home=can_work_from_home,
+                birth_date=birth_date,
             )
 
             # manager relationship
@@ -351,7 +368,8 @@ def ldap_search():
         items = search_users(q, limit=15)
         return jsonify({"items": items})
     except Exception as ex:
-        return jsonify({"items": [], "error": str(ex)})
+        logger.warning("Búsqueda en directorio falló")
+        return jsonify({"items": [], "error": "INTERNAL_ERROR"})
 
 
 @admin_rrhh_bp.route("/ldap/user")

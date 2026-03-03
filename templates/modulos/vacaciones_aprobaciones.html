@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Aprobaciones · Vacaciones{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="mb-2">Bandeja de aprobaciones · Vacaciones</h4>
+    <p class="text-muted">
+      {% if is_backoffice %}
+        Ves <strong>todas</strong> las solicitudes pendientes (por paso activo).
+      {% else %}
+        Ves solo solicitudes pendientes <strong>asignadas a tu usuario</strong>.
+      {% endif %}
+    </p>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Paso</th>
+            <th>Empleado</th>
+            <th>Cédula</th>
+            <th>Periodo</th>
+            <th>Disfrute</th>
+            <th>Pagas</th>
+            <th>Total</th>
+            <th>Creada</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in steps %}
+          <tr>
+            <td>#{{ s.request_id }}</td>
+            <td>{{ s.step_no }}</td>
+            <td>{{ s.employee_name }}</td>
+            <td>{{ s.doc_number }}</td>
+            <td>{{ s.start_date|fecha }} → {{ s.end_date|fecha }}</td>
+            <td>{{ s.days_enjoyed }}</td>
+            <td>{{ s.days_paid }}</td>
+            <td>{{ s.days_total }}</td>
+            <td>{{ s.created_at|fecha_hora }}</td>
+            <td>
+              <form method="post" action="{{ url_for('modulos.vacaciones_aprobaciones_accion') }}" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <input type="hidden" name="step_id" value="{{ s.step_id }}">
+                <input class="form-control form-control-sm" style="min-width:180px;" name="comment" placeholder="Comentario (opcional)">
+                <button class="btn btn-sm btn-primary" name="action" value="APPROVE">Aprobar</button>
+                <button class="btn btn-sm btn-outline-danger" name="action" value="REJECT">Rechazar</button>
+              </form>
+              {% if s.notes %}
+                <div class="text-muted" style="font-size:12px; margin-top:6px;">Nota: {{ s.notes }}</div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not steps %}
+          <tr><td colspan="10" class="text-center text-muted">Sin pendientes</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_backoffice and history %}
+      <hr class="my-4" />
+      <h6 class="mb-2">Histórico (últimas 200)</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered bg-white align-middle">
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Estado</th>
+              <th>Empleado</th>
+              <th>Cédula</th>
+              <th>Periodo</th>
+              <th>Disfrute</th>
+              <th>Pagas</th>
+              <th>Total</th>
+              <th>Creada</th>
+              <th>Cerrada</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in history %}
+            <tr>
+              <td>#{{ r.request_id }}</td>
+              <td>{{ r.status|estado }}</td>
+              <td>{{ r.employee_name }}</td>
+              <td>{{ r.doc_number }}</td>
+              <td>{{ r.start_date|fecha }} → {{ r.end_date|fecha }}</td>
+              <td>{{ r.days_enjoyed }}</td>
+              <td>{{ r.days_paid }}</td>
+              <td>{{ r.days_total }}</td>
+              <td>{{ r.created_at|fecha_hora }}</td>
+              <td>{{ (r.closed_at or '')|fecha_hora }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    <a class="btn btn-link p-0" href="{{ url_for('modulos.dashboard') }}">← Volver al dashboard</a>
+  </div>
+</div>
+{% endblock %}

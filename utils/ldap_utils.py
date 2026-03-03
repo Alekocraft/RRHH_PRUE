@@ -1,4 +1,5 @@
-﻿from ldap3 import Server, Connection, ALL
+from ldap3 import Server, Connection, ALL
+from ldap3.utils.conv import escape_filter_chars
 from flask import current_app
 
 
@@ -39,7 +40,7 @@ def buscar_usuario_ldap(sam):
 
         conn.search(
             search_base=current_app.config["LDAP_SEARCH_BASE"],
-            search_filter=f"(sAMAccountName={sam})",
+            search_filter=f"(sAMAccountName={escape_filter_chars(sam)})",
             attributes=[
                 "displayName",
                 "mail",
@@ -57,12 +58,12 @@ def buscar_usuario_ldap(sam):
         entry = conn.entries[0]
 
         data = {
-            "display_name": str(entry.displayName) if entry.displayName else "",
-            "email": str(entry.mail) if entry.mail else "",
-            "first_name": str(entry.givenName) if entry.givenName else "",
-            "last_name": str(entry.sn) if entry.sn else "",
-            "department": str(entry.department) if entry.department else "",
-            "title": str(entry.title) if entry.title else "",
+            "display_name": (f"{entry.displayName}" if entry.displayName else ""),
+            "email": (f"{entry.mail}" if entry.mail else ""),
+            "first_name": (f"{entry.givenName}" if entry.givenName else ""),
+            "last_name": (f"{entry.sn}" if entry.sn else ""),
+            "department": (f"{entry.department}" if entry.department else ""),
+            "title": (f"{entry.title}" if entry.title else ""),
         }
 
         conn.unbind()
@@ -82,9 +83,9 @@ def buscar_usuarios_ldap_parcial(texto):
 
         search_filter = (
             f"(&(objectClass=user)"
-            f"(|(sAMAccountName=*{texto}*)"
-            f"(displayName=*{texto}*)"
-            f"(mail=*{texto}*)))"
+            f"(|(sAMAccountName=*{escape_filter_chars(texto)}*)"
+            f"(displayName=*{escape_filter_chars(texto)}*)"
+            f"(mail=*{escape_filter_chars(texto)}*)))"
         )
 
         conn.search(

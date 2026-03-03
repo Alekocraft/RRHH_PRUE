@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Cargar vacaciones · RRHH{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>Cargar saldo de vacaciones</h1>
+      <p>
+        Sube el <strong>Libro de Vacaciones</strong> (Excel). El sistema relaciona por <strong>cédula</strong>
+        (columna <code>Identificación</code>) con <code>hr_employee.doc_number</code>.
+      </p>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-secondary" href="{{ url_for('modulos.vacaciones') }}">Volver</a>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:980px;">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Archivo</h2>
+        <p class="card-subtitle">Se toma el acumulado de cada empleado (fila <em>Total Empleado</em>).</p>
+      </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="suggestions" style="flex:1; min-width:260px;">
+          <label>Archivo</label>
+          <input type="file" name="file" accept=".xlsx,.xls" required>
+          <div class="text-muted" style="font-size:12px; margin-top:6px;">
+            Columnas usadas: <strong>Disfrute → Días</strong> (gastado) y <strong>Pendientes</strong> (disponible).
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-16" style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" type="submit">Cargar y aplicar</button>
+        <a class="btn btn-secondary" href="{{ url_for('modulos.vacaciones') }}">Cancelar</a>
+      </div>
+    </form>
+
+    <hr class="divider">
+
+    <div class="small">
+      <strong>Notas:</strong>
+      <ul style="margin:8px 0 0; padding-left:18px;">
+        <li>Si un empleado del Excel no existe en el sistema, se registra como error y no se actualiza.</li>
+        <li>Los valores se guardan como decimales (ej: 7.5).</li>
+      </ul>
+    </div>
+  </div>
+
+  {% if batches %}
+    <div class="card" style="margin-top:18px;">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Histórico de cargas</h2>
+          <p class="card-subtitle">Últimas {{ batches|length }}.</p>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered bg-white align-middle">
+          <thead>
+            <tr>
+              <th>Batch</th>
+              <th>Archivo</th>
+              <th>Fecha</th>
+              <th>Total</th>
+              <th>Matched</th>
+              <th>Actualizados</th>
+              <th>Errores</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in batches %}
+            <tr>
+              <td>#{{ b.batch_id }}</td>
+              <td>{{ b.file_name }}</td>
+              <td>{{ b.uploaded_at|fecha_hora }}</td>
+              <td>{{ b.total_rows or '' }}</td>
+              <td>{{ b.matched_rows or '' }}</td>
+              <td>{{ b.updated_rows or '' }}</td>
+              <td>{{ b.error_rows or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

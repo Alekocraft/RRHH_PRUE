@@ -1,94 +1,118 @@
 {% extends 'base.html' %}
-
 {% block title %}Asistencia · RRHH{% endblock %}
 
 {% block content %}
   <div class="page-header">
     <div>
       <h1>Asistencia</h1>
-      <p>Consolidado mensual (turno vs. marcaciones) con enlaces rápidos para ajustes.</p>
+      <p>Consolidado mensual por colaborador (cumplimiento vs. turno) con cruce: Trabajo en casa, Chequera, Vacaciones, Incapacidad y Hora flexible.</p>
     </div>
     <div class="card-actions">
-      <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia_cargar') }}">Cargar archivo</a>
+      <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia_cargar', year_no=year, month_no=month) }}">Cargar archivo</a>
+      <a class="btn btn-secondary" target="_blank" rel="noopener noreferrer" href="{{ url_for('modulos.asistencia_export', fmt='excel', year=year, month=month, q=q, department=department) }}">Exportar Excel</a>
+      <a class="btn btn-secondary" target="_blank" rel="noopener noreferrer" href="{{ url_for('modulos.asistencia_export', fmt='pdf', year=year, month=month, q=q, department=department) }}">Exportar PDF</a>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" style="margin-bottom:16px;">
     <div class="card-header">
       <div>
-        <h2 class="card-title">Periodo</h2>
-        <p class="card-subtitle">Cambia año/mes y recarga la tabla.</p>
+        <h2 class="card-title">Filtros</h2>
+        <p class="card-subtitle">Busca por nombre o cédula y filtra por departamento.</p>
       </div>
     </div>
-
-    <form method="get" class="form-row">
-      <div style="min-width:140px;flex:0 0 auto;">
-        <label>Año</label>
-        <input type="number" name="year" value="{{ year }}" min="2000" max="2100" />
-      </div>
-      <div style="min-width:140px;flex:0 0 auto;">
-        <label>Mes</label>
-        <select name="month">
-          {% for m in range(1,13) %}
-            <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ '%02d'|format(m) }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div style="min-width:160px;flex:0 0 auto;">
-        <button class="btn" type="submit">Ver</button>
-      </div>
-    </form>
-
-    <p class="small mt-12 m-0">Tip: haz clic en un día con estado <strong>I</strong> o <strong>F</strong> para abrir el ajuste.</p>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <div>
-        <h2 class="card-title">Consolidado</h2>
-        <p class="card-subtitle">{{ year }}-{{ '%02d'|format(month) }} · {{ days|length }} días</p>
-      </div>
-    </div>
-
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th class="sticky-col sticky-col-1">Empleado</th>
-            <th class="sticky-col sticky-col-2">Doc</th>
-            <th class="sticky-col" style="left:290px; min-width:120px;">Turno</th>
-            <th class="sticky-col" style="left:410px; min-width:160px;">Resumen</th>
-            {% for d in days %}
-              <th style="min-width:52px; text-align:center">{{ d.day }}</th>
+    <div class="card-body">
+      <form method="get" class="grid" style="align-items:end; gap:12px;">
+        <div class="col-2">
+          <label class="form-label">Año</label>
+          <input class="form-control" type="number" name="year" value="{{ year }}" min="2000" max="2100">
+        </div>
+        <div class="col-2">
+          <label class="form-label">Mes</label>
+          <input class="form-control" type="number" name="month" value="{{ month }}" min="1" max="12">
+        </div>
+        <div class="col-4">
+          <label class="form-label">Buscar</label>
+          <input class="form-control" type="text" name="q" value="{{ q }}" placeholder="Nombre, apellido o cédula">
+        </div>
+        <div class="col-3">
+          <label class="form-label">Departamento</label>
+          <select class="form-control" name="department">
+            <option value="all" {% if department == 'all' %}selected{% endif %}>Todos</option>
+            {% for d in departments %}
+              <option value="{{ d }}" {% if department == d %}selected{% endif %}>{{ d }}</option>
             {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in matrix %}
-            <tr>
-              <td class="sticky-col sticky-col-1"><strong>{{ r.name }}</strong></td>
-              <td class="sticky-col sticky-col-2">{{ r.doc_number }}</td>
-              <td class="sticky-col" style="left:290px; min-width:120px;">{{ r.shift }}</td>
-              <td class="sticky-col" style="left:410px; min-width:160px;">
-                <span class="badge-ok">OK {{ r.summary.ok }}</span>
-                <span class="badge-warn">I {{ r.summary.incompleto }}</span>
-                <span class="badge-danger">F {{ r.summary.falta }}</span>
-              </td>
-              {% for c in r.days %}
-                {% set st = c.status %}
-                {% set cls = 'cell cell-gray' if st in ['—','ST'] else ('cell cell-home' if st == 'CASA' else ('cell cell-bad' if st == 'F' else ('cell cell-warn' if st == 'I' else 'cell cell-ok'))) %}
-                <td style="text-align:center">
-                  {% if c.link %}
-                    <a href="{{ c.link }}" class="{{ cls }}" title="{{ c.title }}">{{ st }}</a>
-                  {% else %}
-                    <span class="{{ cls }}" title="{{ c.title }}">{{ st }}</span>
-                  {% endif %}
-                </td>
+          </select>
+        </div>
+        <div class="col-1">
+          <button class="btn btn-primary" type="submit" style="width:100%;">Filtrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Colaboradores</h2>
+        <p class="card-subtitle">Total: {{ total_count }}. Página {{ page }} / {{ total_pages }}.</p>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if rows and rows|length > 0 %}
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered bg-white align-middle">
+            <thead>
+              <tr>
+                <th>Cédula</th>
+                <th>Nombre</th>
+                <th>Departamento</th>
+                <th>Turno</th>
+                <th class="text-center">Cumple</th>
+                <th class="text-center">Incompleto</th>
+                <th class="text-center">Faltante</th>
+                <th class="text-center" title="Trabajo en casa">Casa</th>
+                <th class="text-center">Justificado</th>
+                <th class="text-center">Sin turno</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr>
+                  <td>{{ r.doc_number }}</td>
+                  <td>{{ r.name }}</td>
+                  <td>{{ r.department }}</td>
+                  <td>{{ r.shift }}</td>
+                  <td class="text-center"><span class="badge badge-ok">{{ r.summary.cumple }}</span></td>
+                  <td class="text-center"><span class="badge badge-warn">{{ r.summary.incompleto }}</span></td>
+                  <td class="text-center"><span class="badge badge-danger">{{ r.summary.faltante }}</span></td>
+                  <td class="text-center"><span class="badge badge-info">{{ r.summary.casa }}</span></td>
+                  <td class="text-center"><span class="badge badge-secondary">{{ r.summary.justificado }}</span></td>
+                  <td class="text-center"><span class="badge badge-secondary">{{ r.summary.sin_turno }}</span></td>
+                  <td class="text-center">
+                    <a class="btn btn-sm btn-primary" href="{{ url_for('modulos.asistencia_detalle', employee_id=r.employee_id, year=year, month=month) }}">Ver detalle</a>
+                  </td>
+                </tr>
               {% endfor %}
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+          <div class="text-muted">Mostrando {{ rows|length }} de {{ total_count }}.</div>
+          <div style="display:flex; gap:8px;">
+            {% set prev = page - 1 %}
+            {% set nextp = page + 1 %}
+            <a class="btn btn-sm btn-secondary {% if page <= 1 %}disabled{% endif %}"
+               href="{{ url_for('modulos.asistencia', year=year, month=month, q=q, department=department, page=prev) }}">Anterior</a>
+            <a class="btn btn-sm btn-secondary {% if page >= total_pages %}disabled{% endif %}"
+               href="{{ url_for('modulos.asistencia', year=year, month=month, q=q, department=department, page=nextp) }}">Siguiente</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-info" style="margin:0;">No hay resultados con esos filtros.</div>
+      {% endif %}
     </div>
   </div>
 {% endblock %}

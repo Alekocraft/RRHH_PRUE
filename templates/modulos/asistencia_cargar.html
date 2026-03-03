@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
-
 {% block title %}Cargar asistencia · RRHH{% endblock %}
 
 {% block content %}
   <div class="page-header">
     <div>
       <h1>Cargar asistencia</h1>
-      <p>Sube el Excel del mes. El sistema agrupa por (cédula + fecha) y aplica el batch.</p>
+      <p>Sube el Excel del mes. La carga es <b>acumulativa</b>: no reemplaza registros previos, consolida por (cédula + fecha).</p>
     </div>
     <div class="card-actions">
       <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia', year=year_no, month=month_no) }}">Volver</a>
@@ -17,43 +16,32 @@
     <div class="card-header">
       <div>
         <h2 class="card-title">Archivo de asistencia</h2>
-        <p class="card-subtitle">La cédula debe coincidir con <strong>hr_employee.doc_number</strong>.</p>
+        <p class="card-subtitle">Formato: "Employee ID, Fecha, Primera Marcación, Última Marcación, Tiempo Total".</p>
       </div>
     </div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" class="grid" style="gap:12px; align-items:end;">
+        <div class="col-2">
+          <label class="form-label">Año</label>
+          <input class="form-control" type="number" name="year_no" value="{{ year_no }}" min="2000" max="2100">
+        </div>
+        <div class="col-2">
+          <label class="form-label">Mes</label>
+          <input class="form-control" type="number" name="month_no" value="{{ month_no }}" min="1" max="12">
+        </div>
+        <div class="col-8">
+          <label class="form-label">Archivo</label>
+          <input class="form-control" type="file" name="file" accept=".xlsx,.xls">
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary" type="submit">Cargar y acumular</button>
+        </div>
+      </form>
 
-    <form method="post" enctype="multipart/form-data">
-      <div class="form-row">
-        <div style="min-width:140px;flex:0 0 auto;">
-          <label>Año</label>
-          <input type="number" name="year_no" value="{{ year_no }}" min="2000" max="2100" required>
-        </div>
-        <div style="min-width:140px;flex:0 0 auto;">
-          <label>Mes</label>
-          <input type="number" name="month_no" value="{{ month_no }}" min="1" max="12" required>
-        </div>
-        <div class="suggestions" style="flex:1;min-width:260px;">
-          <label>Archivo</label>
-          <input type="file" name="file" accept=".xlsx,.xls" required>
-        </div>
+      <div class="alert alert-info" style="margin-top:12px;">
+        <b>Cumplimiento:</b> el consolidado descuenta automáticamente Hora Flexible, Chequera (medio día),
+        Vacaciones aprobadas, Incapacidad aprobada y reconoce Trabajo en casa.
       </div>
-
-      <div class="mt-16" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn" type="submit">Cargar y aplicar</button>
-        <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia', year=year_no, month=month_no) }}">Cancelar</a>
-      </div>
-    </form>
-
-    <hr class="divider">
-
-    <div class="small">
-      <strong>Si sale “No se encontró columna...”</strong>, valida los encabezados típicos:
-      <ul style="margin:8px 0 0; padding-left:18px;">
-        <li>Documento / Cédula</li>
-        <li>Fecha</li>
-        <li>Entrada</li>
-        <li>Salida</li>
-        <li>Total minutos (opcional)</li>
-      </ul>
     </div>
   </div>
 {% endblock %}

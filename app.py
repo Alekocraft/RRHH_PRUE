@@ -63,7 +63,7 @@ def create_app():
         """Traduce estados técnicos a etiquetas en español para la interfaz."""
         if value is None:
             return ""
-        v = str(value).strip()
+        v = (f"{value}").strip()
         if not v:
             return ""
         up = v.upper()
@@ -82,7 +82,7 @@ def create_app():
             return value
         if isinstance(value, _date):
             return _dt.combine(value, _dt.min.time())
-        s = str(value).strip()
+        s = (f"{value}").strip()
         if not s:
             return None
         s = s.replace("T", " ")
@@ -111,6 +111,27 @@ def create_app():
     def index():
         return redirect(url_for("modulos.dashboard"))
 
+    # ------------------------------------------------------------------
+    # Helpers para templates: evitan BuildError cuando hay módulos opcionales
+    # ------------------------------------------------------------------
+    def has_endpoint(endpoint: str) -> bool:
+        try:
+            return endpoint in app.view_functions
+        except Exception:
+            return False
+
+    def safe_url_for(endpoint: str, **values):
+        try:
+            return url_for(endpoint, **values)
+        except Exception:
+            return "#"
+
+    app.jinja_env.globals["has_endpoint"] = has_endpoint
+    app.jinja_env.globals["safe_url_for"] = safe_url_for
+
+
+
+
     return app
 
 
@@ -118,4 +139,6 @@ if __name__ == "__main__":
     app = create_app()
     port = int(os.getenv("PORT", "5011"))
     # No exponer debugger en la red
-    app.run(host="0.0.0.0", port=port, debug=False)
+    dev_tls = (os.getenv("RRHH_DEV_TLS", "1").strip().lower() not in ("0","false","no","off"))
+    ssl_ctx = "adhoc" if dev_tls else None
+    app.run(host="0.0.0.0", port=port, debug=False, ssl_context=ssl_ctx)
