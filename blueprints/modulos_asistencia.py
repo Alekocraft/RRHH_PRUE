@@ -111,14 +111,14 @@ def _parse_attendance_excel(file_path: str) -> List[Dict]:
     header_row = 1
     for r in range(1, 7):
         vals = [ws.cell(row=r, column=c).value for c in range(1, 15)]
-        joined = " ".join([f"{v}".lower() for v in vals if v is not None])
+        joined = " ".join([str(v).lower() for v in vals if v is not None])
         if "fecha" in joined and ("employee" in joined or "cedula" in joined or "id" in joined):
             header_row = r
             break
 
     header = []
     for cell in ws[header_row]:
-        header.append(f"{cell.value}".strip().lower() if cell.value is not None else "")
+        header.append(str(cell.value).strip().lower() if cell.value is not None else "")
     header_map = {name: idx for idx, name in enumerate(header)}
 
     def find_col(patterns):
@@ -155,7 +155,7 @@ def _parse_attendance_excel(file_path: str) -> List[Dict]:
 
         key = (doc, wdate)
         entry = grouped.get(key)
-        raw = {"row": [f"{x}" if x is not None else "" for x in r]}
+        raw = {"row": [str(x) if x is not None else "" for x in r]}
 
         if entry is None:
             grouped[key] = {
@@ -208,92 +208,17 @@ def _attendance_effective_view() -> str:
 # Cross-module helpers (vacaciones / incapacidad / chequera / feriados)
 # ============================================================
 def _holidays_between(d_from: date, d_to: date) -> Set[date]:
-    """Obtiene festivos entre dos fechas.
+    exists = fetch_one(
+        "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='rrhh' AND TABLE_NAME='hr_holiday'"
+    )
+    if not exists:
+        return set()
+    rows = fetch_all(
+        "SELECT holiday_date FROM rrhh.hr_holiday WHERE is_active=1 AND holiday_date BETWEEN ? AND ?",
+        (d_from, d_to),
+    )
+    return {r.holiday_date for r in rows}
 
-    Soporta variaciones comunes del esquema (nombre de tabla/columna) para evitar
-    marcar festivos como faltantes en Asistencia.
-    """
-    out: Set[date] = set()
-
-    def _table_exists(schema: str, name: str) -> bool:
-        try:
-            return (
-                fetch_one(
-                    "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?",
-                    (schema, name),
-                )
-                is not None
-            )
-        except Exception:
-            return False
-
-    def _pick_col(schema: str, table: str, candidates: List[str]) -> Optional[str]:
-        for c in candidates:
-            if _has_column(schema, table, c):
-                return c
-        return None
-
-    # Tablas candidatas (en orden de preferencia)
-    candidates = [
-        ("rrhh", "hr_holiday"),
-        ("rrhh", "hr_holidays"),
-        ("rrhh", "holiday"),
-        ("rrhh", "holidays"),
-        ("rrhh", "festivo"),
-        ("rrhh", "festivos"),
-        ("rrhh", "holiday_calendar"),
-        ("rrhh", "calendar_day"),
-    ]
-
-    date_cols = [
-        "holiday_date",
-        "festive_date",
-        "work_date",
-        "date",
-        "day",
-        "fecha",
-        "dia",
-    ]
-
-    for schema, table in candidates:
-        if not _table_exists(schema, table):
-            continue
-
-        date_col = _pick_col(schema, table, date_cols)
-        if not date_col:
-            continue
-
-        wh = [f"{date_col} BETWEEN ? AND ?"]
-        params = [d_from, d_to]
-
-        # Filtros típicos de activo/flag de festivo
-        if _has_column(schema, table, "is_active"):
-            wh.append("is_active=1")
-        elif _has_column(schema, table, "active"):
-            wh.append("active=1")
-        elif _has_column(schema, table, "is_holiday"):
-            wh.append("is_holiday=1")
-
-        q = f"SELECT {date_col} AS d FROM {schema}.{table} WHERE " + " AND ".join(wh)
-
-        try:
-            rows = fetch_all(q, tuple(params))
-        except Exception:
-            continue
-
-        for r in rows:
-            d = getattr(r, "d", None)
-            if not d:
-                continue
-            # pyodbc puede devolver datetime; normalizamos a date
-            try:
-                dd = d.date() if hasattr(d, "date") else d
-            except Exception:
-                continue
-            if isinstance(dd, date):
-                out.add(dd)
-
-    return out
 
 def _approved_incap_days(emp_ids: List[int], d_from: date, d_to: date) -> Set[Tuple[int, date]]:
     exists = fetch_one(
@@ -878,8 +803,9 @@ def asistencia_detalle_export(fmt: str):
     # Reutilizar la lógica del detalle construyendo items
     days = [d_from + timedelta(days=i) for i in range((d_to - d_from).days + 1)]
     holidays = _holidays_between(d_from, d_to)
-    workdays = [d for d in days if d.weekday() < 5 and d not in holidays]
 
+    # En el detalle mostramos también los festivos como filas informativas
+    workdays = [d for d in days if d.weekday() < 5]
     view = _attendance_effective_view()
     att_rows = fetch_all(
         f"SELECT employee_id, work_date, first_in, last_out, total_minutes, has_manual_override "
@@ -967,6 +893,9 @@ def asistencia_detalle_export(fmt: str):
 
     out = []
     for d in workdays:
+        if d in holidays:
+            out.append([d.isoformat(), "FEST", "Festivo", "", "", ""])
+            continue
         if (employee_id, d) in incap_set:
             out.append([d.isoformat(), "INC", "Incapacidad aprobada", "", "", ""])
             continue
@@ -988,17 +917,17 @@ def asistencia_detalle_export(fmt: str):
         att = att_map.get(d)
         if att is None or att.total_minutes is None:
             if d in wfh_set:
-                out.append([d.isoformat(), "CASA", f"Trabajo en casa (req {required} min)", "", "", f"{required}"])
+                out.append([d.isoformat(), "CASA", f"Trabajo en casa (req {required} min)", "", "", str(required)])
             else:
-                out.append([d.isoformat(), "F", f"Faltante (req {required} min)", "", "", f"{required}"])
+                out.append([d.isoformat(), "F", f"Faltante (req {required} min)", "", "", str(required)])
             continue
 
         mins = int(att.total_minutes or 0)
         if mins >= required:
             st = "OK*" if getattr(att, "has_manual_override", 0) else "OK"
-            out.append([d.isoformat(), st, f"Cumple (req {required} min)", f"{att.first_in or ""}", f"{att.last_out or ""}", f"{mins}"])
+            out.append([d.isoformat(), st, f"Cumple (req {required} min)", str(att.first_in or ""), str(att.last_out or ""), str(mins)])
         else:
-            out.append([d.isoformat(), "I", f"Incompleto (req {required} min)", f"{att.first_in or ""}", f"{att.last_out or ""}", f"{mins}"])
+            out.append([d.isoformat(), "I", f"Incompleto (req {required} min)", str(att.first_in or ""), str(att.last_out or ""), str(mins)])
 
     headers = ["Fecha", "Estado", "Detalle", "Primera", "Última", "Minutos"]
     title = f"Detalle de asistencia {y:04d}-{m:02d}"
@@ -1044,8 +973,9 @@ def asistencia_detalle():
 
     days = [d_from + timedelta(days=i) for i in range((d_to - d_from).days + 1)]
     holidays = _holidays_between(d_from, d_to)
-    workdays = [d for d in days if d.weekday() < 5 and d not in holidays]
 
+    # En el detalle mostramos también los festivos como filas informativas
+    workdays = [d for d in days if d.weekday() < 5]
     view = _attendance_effective_view()
     att_rows = fetch_all(
         f"SELECT employee_id, work_date, first_in, last_out, total_minutes, has_manual_override "
@@ -1133,6 +1063,9 @@ def asistencia_detalle():
 
     items = []
     for d in workdays:
+        if d in holidays:
+            items.append({"date": d, "status": "FEST", "title": "Festivo", "link": None})
+            continue
         if (employee_id, d) in incap_set:
             items.append({"date": d, "status": "INC", "title": "Incapacidad aprobada", "link": None})
             continue
@@ -1334,8 +1267,8 @@ def asistencia_ajuste():
 
         mins = None
         try:
-            if total_minutes is not None and f"{total_minutes}".strip() != "":
-                mins = int(float(f"{total_minutes}".strip()))
+            if total_minutes is not None and str(total_minutes).strip() != "":
+                mins = int(float(str(total_minutes).strip()))
         except Exception:
             mins = None
 

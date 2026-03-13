@@ -52,6 +52,21 @@
         </div>
       </div>
 
+
+      <div class="form-row mt-12">
+        <div>
+          <label>Equipo operativo (Tablero 24/7)</label>
+          <select name="shift_group" id="shift_group">
+            <option value="CABINA" {% if (emp.shift_group or 'ADMIN')|upper == 'CABINA' %}selected{% endif %}>Cabina</option>
+            <option value="AJUSTADOR" {% if (emp.shift_group or 'ADMIN')|upper in ['AJUSTADOR','AJUSTADORES'] %}selected{% endif %}>Ajustadores</option>
+            <option value="ADMIN" {% if (emp.shift_group or 'ADMIN')|upper == 'ADMIN' %}selected{% endif %}>Administrativo (no aparece en tableros)</option>
+          </select>
+          <div class="small" style="margin-top:6px; color:var(--muted);">
+            Cambiar esto mueve al colaborador entre tableros (CABINA/AJUSTADORES). Los administrativos no se programan aquí.
+          </div>
+        </div>
+      </div>
+
       <div class="form-row mt-12">
         <div>
           <label>Jefe</label>

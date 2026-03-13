@@ -5,7 +5,14 @@ from datetime import date, datetime, timedelta
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 
-from services.rrhh_db import fetch_one, fetch_all, execute, execute_scalar, call_proc
+from services.rrhh_db import fetch_one, fetch_all, execute, execute_scalar
+from services.workflow_service import (
+    wf_tables_exist,
+    wf_submit_request,
+    wf_clear_steps,
+    wf_create_steps,
+    resolve_manager_user_id,
+)
 
 from .modulos import modulos_bp
 from .modulos_common import _is_admin_or_rrhh
@@ -274,9 +281,24 @@ def hora_flexible_nueva():
             (request_id, weekday, slot, valid_from),
         )
 
+        # Workflow (obligatorio): JEFE -> RRHH
         try:
-            call_proc("rrhh.sp_submit_request", [request_id, int(current_user.user_id)])
-            flash("Solicitud enviada al flujo de aprobaciones.", "success")
+            if not wf_tables_exist():
+                raise RuntimeError("No están creadas las tablas wf_request / wf_request_step")
+
+            mgr_user_id = resolve_manager_user_id(employee_id)
+            if not mgr_user_id:
+                raise RuntimeError(
+                    "No tienes jefe asignado (o tu jefe no tiene usuario activo en el sistema). "
+                    "RRHH debe asignar el jefe para poder enviar la solicitud."
+                )
+
+            # Reconstrucción determinística de pasos:
+            #  1) Jefe (asignado)  2) RRHH/ADMIN (cola backoffice)
+            wf_submit_request(int(request_id), int(current_user.user_id))
+            wf_clear_steps(int(request_id))
+            wf_create_steps(int(request_id), [int(mgr_user_id), None])
+            flash("Solicitud enviada: requiere aprobación de tu jefe y de RRHH.", "success")
         except Exception as ex:
             flash(f"No se pudo enviar la solicitud al workflow: {ex}", "danger")
 

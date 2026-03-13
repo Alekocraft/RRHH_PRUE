@@ -95,6 +95,23 @@
         </div>
       </div>
 
+
+      <!-- Turnos 24/7 -->
+      <div class="form-row" style="margin-top:6px;">
+        <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+          <label class="label">Equipo operativo (Tablero 24/7) <span style="color:red;">*</span></label>
+          <select class="input" id="shift_group" name="shift_group" required>
+            <option value="" {% if form and not form.get('shift_group') %}selected{% endif %}>— Seleccionar —</option>
+            <option value="CABINA" {% if form and (form.get('shift_group')|upper) == 'CABINA' %}selected{% endif %}>Cabina</option>
+            <option value="AJUSTADOR" {% if form and (form.get('shift_group')|upper) in ['AJUSTADOR','AJUSTADORES'] %}selected{% endif %}>Ajustadores</option>
+            <option value="ADMIN" {% if form and (form.get('shift_group')|upper) == 'ADMIN' %}selected{% endif %}>Administrativo (no aparece en tableros)</option>
+          </select>
+          <div class="small" style="margin-top:6px; color:var(--muted);">
+            Define en qué tablero aparece el colaborador. Para cuadrar operación 24/7 usa <b>Cabina</b> o <b>Ajustadores</b>.
+          </div>
+        </div>
+      </div>
+
       <!-- Checks (2 columnas) -->
       <div class="form-row" style="margin-top:6px;">
         <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
@@ -131,7 +148,8 @@
             <li data-check="doc"><span class="mark">•</span> Cédula (*)</li>
             <li data-check="name"><span class="mark">•</span> Nombres y apellidos (*)</li>
             <li data-check="bday"><span class="mark">•</span> Cumpleaños (*)</li>
-            <li data-check="mgr"><span class="mark">•</span> Jefe (recomendado) </li>
+                        <li data-check="grp"><span class="mark">•</span> Equipo operativo 24/7 (*)</li>
+<li data-check="mgr"><span class="mark">•</span> Jefe (recomendado) </li>
           </ul>
           <div class="small" style="margin-top:10px;">
             💡 Si no se asigna jefe, el flujo usa RRHH como respaldo.
@@ -175,6 +193,7 @@
     setOk('name', ($('first_name').value || '').trim().length > 0 && ($('last_name').value || '').trim().length > 0);
     setOk('doc', ($('doc_number').value || '').trim().length > 0);
     setOk('bday', ($('birth_date').value || '').trim().length > 0);
+    setOk('grp', ($('shift_group').value || '').trim().length > 0);
     setOk('mgr', ($('manager_employee_id').value || '').trim().length > 0);
   }
 

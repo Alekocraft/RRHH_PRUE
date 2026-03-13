@@ -258,6 +258,117 @@ def _is_sanitized_expr(expr: ast.AST) -> bool:
 def _contains_sensitive_keyword(s: str) -> bool:
     lower = s.lower()
     return any(k in lower for k in SENSITIVE_KEYWORDS)
+# -----------------------------
+# Heurística de "untrusted input" (para CWE-134 y otros)
+# -----------------------------
+UNTRUSTED_REQUEST_ATTRS = {"args", "form", "values", "json", "headers", "cookies", "files"}
+
+def _root_name(node: ast.AST) -> str:
+    """Devuelve el nombre raíz de una cadena de atributos/subscripts (p.ej. request.form.get -> request)."""
+    cur = node
+    while True:
+        if isinstance(cur, ast.Attribute):
+            cur = cur.value
+            continue
+        if isinstance(cur, ast.Subscript):
+            cur = cur.value
+            continue
+        if isinstance(cur, ast.Call):
+            cur = cur.func
+            continue
+        break
+    if isinstance(cur, ast.Name):
+        return cur.id
+    return ""
+
+def _attr_chain(node: ast.AST) -> List[str]:
+    """Extrae una cadena de atributos: request.form.get -> ['request','form','get'] (aprox)."""
+    out: List[str] = []
+    cur = node
+    while True:
+        if isinstance(cur, ast.Attribute):
+            out.append(cur.attr)
+            cur = cur.value
+            continue
+        if isinstance(cur, ast.Name):
+            out.append(cur.id)
+            break
+        if isinstance(cur, ast.Call):
+            cur = cur.func
+            continue
+        if isinstance(cur, ast.Subscript):
+            cur = cur.value
+            continue
+        break
+    return list(reversed(out))
+
+def _is_untrusted_expr(expr: ast.AST) -> bool:
+    """
+    Heurística: marca como "untrusted" expresiones típicas de entrada externa.
+    - request.form.get(...), request.args.get(...), request.values.get(...), request.get_json(), request.json, request.headers.get(...)
+    - request.form[...], request.args[...], etc.
+    - input(...)
+    """
+    # input(...)
+    if isinstance(expr, ast.Call) and _call_func_name(expr) == "input":
+        return True
+
+    # request.get_json()
+    if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Attribute):
+        chain = _attr_chain(expr.func)
+        if chain and chain[0] == "request" and chain[-1] in {"get_json", "get_data"}:
+            return True
+
+    # request.<attr>  (p.ej. request.json)
+    if isinstance(expr, ast.Attribute):
+        chain = _attr_chain(expr)
+        if len(chain) >= 2 and chain[0] == "request" and chain[1] in UNTRUSTED_REQUEST_ATTRS:
+            return True
+
+    # request.<attr>[...]
+    if isinstance(expr, ast.Subscript):
+        chain = _attr_chain(expr.value)
+        if len(chain) >= 2 and chain[0] == "request" and chain[1] in UNTRUSTED_REQUEST_ATTRS:
+            return True
+
+    # request.<attr>.get(...)
+    if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Attribute) and expr.func.attr == "get":
+        chain = _attr_chain(expr.func.value)
+        # request.form.get / request.args.get / request.headers.get ...
+        if len(chain) >= 2 and chain[0] == "request" and chain[1] in UNTRUSTED_REQUEST_ATTRS:
+            return True
+
+    return False
+
+def _iter_format_values(expr: ast.AST) -> Iterable[ast.AST]:
+    """Extrae los valores interpolados en formatos clásicos (% / .format / f-string)."""
+    # "..." % (a,b) o "..." % a
+    if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Mod):
+        right = expr.right
+        if isinstance(right, (ast.Tuple, ast.List)):
+            for elt in right.elts:
+                yield elt
+        else:
+            yield right
+        return
+
+    # "...".format(a, b, x=c)
+    if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Attribute) and expr.func.attr == "format":
+        for a in expr.args:
+            yield a
+        for kw in expr.keywords:
+            if kw.value is not None:
+                yield kw.value
+        return
+
+    # f"...{x}..."
+    if isinstance(expr, ast.JoinedStr):
+        for v in expr.values:
+            if isinstance(v, ast.FormattedValue):
+                yield v.value
+        return
+
+    return
 
 
 # -----------------------------
@@ -735,6 +846,71 @@ def check_dom_xss_patterns(root: Path, files: Iterable[Path], context: int) -> L
     return findings
 
 
+
+def check_format_string_untrusted_input(root: Path, files: Iterable[Path], relaxed: bool, context: int) -> List[Finding]:
+    """
+    CWE-134: Exclude unsanitized user input from format strings
+    Según reportes Kiuwan: evitar incorporar input no sanitizado en interpolaciones (% / .format / f-strings)
+    cuando el valor proviene de fuentes típicas (request.form/args/values/json/headers/cookies/files, input()).
+
+    NOTA:
+      - Es una heurística "strict-by-default": si detecta entrada no sanitizada en un formato, marca ERROR.
+      - Si --relaxed: permite algunos IDs (_id) en interpolaciones simples.
+    """
+    findings: List[Finding] = []
+
+    for path in files:
+        if path.suffix.lower() != ".py":
+            continue
+        text = read_text(path)
+        if text is None:
+            continue
+        tree = safe_ast_parse(path, text)
+        if tree is None:
+            continue
+
+        for node in ast.walk(tree):
+            candidate: Optional[ast.AST] = None
+
+            # 1) "..." % (...)
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod) and isinstance(node.left, ast.Constant) and isinstance(node.left.value, str):
+                candidate = node
+
+            # 2) "...".format(...)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+                # value debe ser string literal para reducir FP
+                if isinstance(node.func.value, ast.Constant) and isinstance(node.func.value.value, str):
+                    candidate = node
+
+            # 3) f-string en retornos / argumentos de llamadas (reduce ruido vs. cualquier f-string suelto)
+            if isinstance(node, ast.JoinedStr):
+                candidate = node
+
+            if candidate is None:
+                continue
+
+            for v in _iter_format_values(candidate):
+                if _is_sanitized_expr(v):
+                    continue
+                if relaxed and isinstance(v, ast.Name) and v.id.endswith("_id"):
+                    continue
+                if _is_untrusted_expr(v):
+                    lineno = getattr(candidate, "lineno", getattr(node, "lineno", 1))
+                    findings.append(Finding(
+                        rule="CWE-134: Exclude unsanitized user input from format strings",
+                        severity="ERROR",
+                        path=normalize_path(str(path.relative_to(root))),
+                        line=lineno,
+                        message=("Interpolación de input no sanitizado en formato (% / .format / f-string). "
+                                 "Sanitiza/castea el valor (p.ej. sanitizar_log_text/sanitizar_username/int/escape) "
+                                 "o evita construir el mensaje con input directo."),
+                        snippet=find_line_snippet(text, lineno, context=context),
+                    ))
+                    break
+
+    return findings
+
+
 def check_known_unused_locals(root: Path, files: Iterable[Path], context: int) -> List[Finding]:
     """
     Kiuwan: Avoid unused local variable (pattern-based)
@@ -782,6 +958,7 @@ def run_all(root: Path, only_paths: Optional[List[str]], relaxed: bool, context:
     findings += check_target_blank_rel(root, files, context=context)
     findings += check_execution_after_redirect(root, files, context=context)
     findings += check_dom_xss_patterns(root, files, context=context)
+    findings += check_format_string_untrusted_input(root, files, relaxed=relaxed, context=context)
     findings += check_logging_untrusted_input(root, files, relaxed=relaxed, context=context)
     findings += check_sensitive_error_messages(root, files, context=context)
     findings += check_known_unused_locals(root, files, context=context)

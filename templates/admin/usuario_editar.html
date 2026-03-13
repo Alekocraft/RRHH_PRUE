@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Editar usuario · Admin{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">Editar usuario</h2>
+      <div class="small" style="margin-top:6px; color:var(--muted);">
+        Usuario AD: <b>{{ u.ad_username }}</b>
+      </div>
+    </div>
+    <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Volver</a>
+  </div>
+</div>
+
+<div class="card">
+  <form method="post">
+    <input type="hidden" name="user_id" value="{{ u.user_id }}">
+
+    <div class="form-row">
+      <div style="min-width:320px; flex:1 1 320px;">
+        <label>Empleado asociado</label>
+        <select name="employee_id">
+          <option value="">— Sin asociar —</option>
+          {% for e in empleados %}
+            <option value="{{ e.employee_id }}" {% if u.employee_id and (u.employee_id|int == e.employee_id|int) %}selected{% endif %}>
+              {{ e.doc_number }} - {{ e.first_name }} {{ e.last_name }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if u.employee_id %}
+          <div class="small" style="margin-top:6px;">
+            <a href="{{ url_for('admin_rrhh.empleado_editar', employee_id=u.employee_id) }}">Editar empleado</a>
+          </div>
+        {% endif %}
+      </div>
+      <div class="checkbox" style="min-width:220px; flex:0 0 auto; align-self:end;">
+        <input type="checkbox" id="is_active" name="is_active" {% if u.is_active %}checked{% endif %}>
+        <label for="is_active" style="margin:0;">Activo</label>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div>
+      <div style="font-weight:900; margin-bottom:8px;">Roles</div>
+      <div class="small" style="color:var(--muted); margin-bottom:10px;">
+        El rol <b>EMPLEADO</b> se asigna automáticamente.
+        {% if admin_locked or rrhh_locked %}
+          Además, si el usuario ya es <b>Administrador</b> o <b>RRHH</b>, esos roles quedan <b>fijos</b> (no se desmarcan).
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap;">
+        {% for r in roles_catalog %}
+          {% set locked = (admin_locked and r.role_code == 'ADMINISTRADOR') or (rrhh_locked and r.role_code == 'RRHH') %}
+          <label class="small" style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(2,6,23,.10); border-radius:14px; opacity: {{ '0.85' if locked else '1' }};">
+            <input type="checkbox" name="role_{{ r.role_code }}"
+                   {% if r.role_code in u.roles %}checked{% endif %}
+                   {% if locked %}disabled{% endif %}>
+            <span style="font-weight:800;">{{ r.role_name }}</span>
+            {% if locked %}<span class="badge" style="border:1px solid rgba(2,6,23,.12); padding:2px 8px; border-radius:999px; font-size:12px;">Fijo</span>{% endif %}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Guardar</button>
+      <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

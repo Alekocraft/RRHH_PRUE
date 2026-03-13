@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Crear usuario · Admin{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">Crear usuario</h2>
+      <div class="small" style="margin-top:6px; color:var(--muted);">
+        Crea (si no existe) el usuario en <b>auth_user</b>, lo asocia a un empleado y asigna roles.
+      </div>
+    </div>
+    <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Volver</a>
+  </div>
+</div>
+
+<div class="card">
+  <form method="post">
+    <div class="form-row">
+      <div style="min-width:320px; flex:1 1 320px;">
+        <label>Usuario AD (samAccountName)</label>
+        <input name="ad_username" placeholder="ej: jperez" required value="{{ form.ad_username if form else '' }}">
+        <div class="small" style="margin-top:6px; color:var(--muted);">Sin dominio. Ej: <b>jperez</b></div>
+      </div>
+      <div style="min-width:320px; flex:1 1 320px;">
+        <label>Empleado asociado (opcional)</label>
+        <select name="employee_id">
+          <option value="">— Sin asociar —</option>
+          {% for e in empleados %}
+            <option value="{{ e.employee_id }}" {% if form and form.employee_id and (form.employee_id|int == e.employee_id|int) %}selected{% endif %}>
+              {{ e.doc_number }} - {{ e.first_name }} {{ e.last_name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row mt-12">
+      <div class="checkbox" style="min-width:220px; flex:0 0 auto;">
+        <input type="checkbox" id="is_active" name="is_active" {% if not form or form.is_active %}checked{% endif %}>
+        <label for="is_active" style="margin:0;">Activo</label>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div>
+      <div style="font-weight:900; margin-bottom:8px;">Roles</div>
+      <div class="small" style="color:var(--muted); margin-bottom:10px;">El rol <b>EMPLEADO</b> se asigna automáticamente.</div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap;">
+        {% for r in roles_catalog %}
+          <label class="small" style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(2,6,23,.10); border-radius:14px;">
+            <input type="checkbox" name="role_{{ r.role_code }}" {% if form and (r.role_code in (form.roles or [])) %}checked{% endif %}>
+            <span style="font-weight:800;">{{ r.role_name }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Crear</button>
+      <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

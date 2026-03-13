@@ -1,1 +1,1 @@
-# utils package
+# config package

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Cobertura 24/7 · Turnos{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">Cobertura mínima 24/7</h2>
+      <div class="small" style="margin-top:6px; color:var(--muted);">
+        Define cuántas personas mínimo deben estar asignadas por <b>turno</b> y <b>día de semana</b>.
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos_tablero', group=group) }}">Volver al tablero</a>
+      <form method="get" action="{{ url_for('modulos.turnos_cobertura') }}">
+        <select name="group" class="input" style="min-width:200px;">
+          <option value="CABINA" {% if group=='CABINA' %}selected{% endif %}>CABINA</option>
+          <option value="AJUSTADOR" {% if group=='AJUSTADOR' %}selected{% endif %}>AJUSTADORES</option>
+        </select>
+        <button class="btn" type="submit">Cambiar</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="post" action="{{ url_for('modulos.turnos_cobertura') }}">
+    <input type="hidden" name="group" value="{{ group }}" />
+    <div style="overflow:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Turno</th>
+            <th>Lun</th>
+            <th>Mar</th>
+            <th>Mié</th>
+            <th>Jue</th>
+            <th>Vie</th>
+            <th>Sáb</th>
+            <th>Dom</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in shifts %}
+            <tr>
+              <td>
+                <b>{{ s.shift_code }}</b>
+                <div class="small" style="color:var(--muted);">{{ s.start_time.strftime('%H:%M') if s.start_time else '' }}-{{ s.end_time.strftime('%H:%M') if s.end_time else '' }}</div>
+              </td>
+              {% for wd in range(1,8) %}
+                {% set cur = req_map.get((wd, s.shift_id), 0) %}
+                <td>
+                  <input
+                    class="input"
+                    style="width:80px;"
+                    type="number"
+                    min="0"
+                    name="req_{{ wd }}_{{ s.shift_id }}"
+                    value="{{ cur }}"
+                  />
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px;">
+      <button class="btn btn-primary" type="submit">Guardar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

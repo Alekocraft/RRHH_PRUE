@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Sesión 24h · Turnos{% endblock %}
+
+{% block head %}
+<style>
+  .wrap{ display:grid; grid-template-columns: 1.2fr .8fr; gap:14px; }
+  @media (max-width: 1100px){ .wrap{ grid-template-columns: 1fr; } }
+
+  .hours{ overflow:auto; }
+  .hours-table{ border-collapse:collapse; width:100%; }
+  .hours-table th, .hours-table td{ border:1px solid rgba(2,6,23,.10); padding:10px 12px; font-size:13px; vertical-align:top; }
+  .hours-table th{ background:#fff; position:sticky; top:0; z-index:2; }
+
+  .hcell{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ display:inline-flex; align-items:center; gap:8px; padding:4px 10px; border-radius:999px; border:1px solid rgba(2,6,23,.12); background:rgba(2,6,23,.03); }
+  .chip b{ font-weight:900; }
+
+  .gap{ background:rgba(239,68,68,.06); }
+  .badge{ display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid rgba(2,6,23,.12); }
+  .badge.ok{ background:rgba(16,185,129,.10); }
+  .badge.err{ background:rgba(239,68,68,.10); }
+
+  .form-card{ position:sticky; top:12px; }
+  .multi{ max-height:320px; overflow:auto; border:1px solid rgba(2,6,23,.12); border-radius:12px; padding:10px; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .row > *{ flex:1; min-width:180px; }
+
+  .mini{ font-size:12px; color:var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+    <div>
+      <h2 style="margin:0;">Sesión 24h (estilo Teams)</h2>
+      <div class="small" style="margin-top:6px; color:var(--muted);">
+        Día: <b>{{ day|fecha }}</b> · Semana: <b>{{ ws|fecha }}</b> · Grupo: <b>{{ group }}</b>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos_tablero', week=ws|fecha, group=group) }}">← Volver a semana</a>
+      <a class="btn" href="{{ url_for('modulos.turnos_sesion', week=ws|fecha, group=group, day=day|fecha) }}">Refrescar</a>
+    </div>
+  </div>
+
+  {% if gaps and gaps|length > 0 %}
+    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <span class="badge err">⚠️ Huecos 24/7: {{ gaps|length }} hora(s) sin personal</span>
+      <span class="mini">Tip: haz clic en “Asignar aquí” en una hora vacía para preseleccionar esa hora.</span>
+    </div>
+  {% else %}
+    <div style="margin-top:10px;">
+      <span class="badge ok">✅ Día cubierto (al menos 1 persona por hora)</span>
+    </div>
+  {% endif %}
+</div>
+
+<div class="wrap">
+  <div class="card hours">
+    <div style="font-weight:900; margin-bottom:10px;">Cobertura por hora</div>
+    <table class="hours-table">
+      <thead>
+        <tr>
+          <th style="width:110px;">Hora</th>
+          <th>Participantes (personas en turno)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in range(0,24) %}
+          {% set ppl = hour_participants[h] %}
+          <tr class="{% if ppl|length == 0 %}gap{% endif %}">
+            <td>
+              <div style="font-weight:900;">{{ "%02d"|format(h) }}:00</div>
+              <div class="mini">{{ ppl|length }} persona(s)</div>
+              <button class="btn btn-ghost" type="button" style="padding:6px 8px; font-size:12px; margin-top:6px;" onclick="pickHour({{ h }})">Asignar aquí</button>
+            </td>
+            <td>
+              <div class="hcell">
+                <div class="chips">
+                  {% if ppl|length == 0 %}
+                    <span class="mini">— sin asignación —</span>
+                  {% else %}
+                    {% for p in ppl %}
+                      <span class="chip"><b>{{ p.shift_code }}</b> {{ p.name }}</span>
+                    {% endfor %}
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <div class="card form-card">
+      <div style="font-weight:900; margin-bottom:10px;">Asignar participantes</div>
+
+      <form method="post" action="{{ url_for('modulos.turnos_sesion_asignar') }}" id="assignForm">
+        <input type="hidden" name="week_id" value="{{ week_id }}" />
+        <input type="hidden" name="group" value="{{ group }}" />
+        <input type="hidden" name="day" value="{{ day|fecha }}" />
+
+        <div class="row">
+          <div>
+            <label class="label">Hora a cubrir (referencia)</label>
+            <select class="input" id="hourPick">
+              {% for h in range(0,24) %}
+                <option value="{{ h }}" {% if h in gaps %}{% if loop.first %}{% endif %}{% endif %}>{{ "%02d"|format(h) }}:00</option>
+              {% endfor %}
+            </select>
+            <div class="mini" style="margin-top:6px;">La hora ayuda a sugerir turnos; la asignación se guarda por turno del día.</div>
+          </div>
+          <div>
+            <label class="label">Turno</label>
+            <select class="input" name="shift_code" id="shiftPick" required>
+              <option value="">— Seleccionar —</option>
+              {% for o in shift_opts %}
+                <option value="{{ o.code }}">{{ o.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="mini" id="shiftHint" style="margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label class="label">Personas (puedes elegir una o varias)</label>
+          <input class="input" type="text" id="empSearch" placeholder="Buscar…" />
+          <div class="multi" id="empList" style="margin-top:8px;">
+            {% for e in employees %}
+              <label style="display:flex; gap:10px; align-items:center; padding:6px 4px;">
+                <input type="checkbox" name="employee_ids" value="{{ e.employee_id }}" />
+                <div>
+                  <div style="font-weight:800;">{{ e.first_name }} {{ e.last_name }}</div>
+                  <div class="mini">{{ e.doc_number }}</div>
+                </div>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-primary" type="submit">Asignar</button>
+        </div>
+      </form>
+
+      <hr style="margin:14px 0; border:none; border-top:1px solid rgba(2,6,23,.10);" />
+
+      <div style="font-weight:900; margin-bottom:8px;">Asignaciones del día</div>
+      {% if assigned and assigned|length > 0 %}
+        <div class="mini" style="margin-bottom:8px;">Quitar aquí elimina la asignación del día (lo mismo que dejar la celda vacía en el tablero semanal).</div>
+        {% for a in assigned %}
+          <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:8px 0; border-top:1px dashed rgba(2,6,23,.10);">
+            <div>
+              <div style="font-weight:800;">{{ a.name }}</div>
+              <div class="mini">{{ a.label }}</div>
+            </div>
+            <form method="post" action="{{ url_for('modulos.turnos_sesion_quitar') }}">
+              <input type="hidden" name="week_id" value="{{ week_id }}" />
+              <input type="hidden" name="group" value="{{ group }}" />
+              <input type="hidden" name="day" value="{{ day|fecha }}" />
+              <input type="hidden" name="employee_id" value="{{ a.employee_id }}" />
+              <button class="btn btn-ghost" type="submit">Quitar</button>
+            </form>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="mini">No hay asignaciones aún.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const hourSuggestions = {{ hour_suggestions|tojson }};
+
+  function pickHour(h){
+    const sel = document.getElementById('hourPick');
+    sel.value = String(h);
+    sel.dispatchEvent(new Event('change'));
+    document.getElementById('shiftPick').focus();
+  }
+
+  function updateShiftHint(){
+    const h = parseInt(document.getElementById('hourPick').value, 10);
+    const sug = hourSuggestions[h] || [];
+    const hint = document.getElementById('shiftHint');
+    if(!sug.length){
+      hint.textContent = 'No hay sugerencias de turno para esta hora.';
+      return;
+    }
+    hint.textContent = 'Sugeridos para esta hora: ' + sug.join(', ');
+  }
+
+  document.getElementById('hourPick').addEventListener('change', updateShiftHint);
+  updateShiftHint();
+
+  // Search empleados
+  const search = document.getElementById('empSearch');
+  const list = document.getElementById('empList');
+  search.addEventListener('input', () => {
+    const q = (search.value || '').trim().toLowerCase();
+    for(const label of list.querySelectorAll('label')){
+      const txt = label.innerText.toLowerCase();
+      label.style.display = txt.includes(q) ? '' : 'none';
+    }
+  });
+</script>
+{% endblock %}

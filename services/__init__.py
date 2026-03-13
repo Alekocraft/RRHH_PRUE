@@ -1,1 +1,1 @@
-# services package
+# config package

@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Tablero 24/7 · Turnos{% endblock %}
+
+{% block head %}
+<style>
+  .grid-wrap{ overflow:auto; }
+  .roster-table{ border-collapse:collapse; width:max-content; min-width:100%; }
+  .roster-table th, .roster-table td{ border:1px solid rgba(2,6,23,.10); padding:8px 10px; font-size:13px; white-space:nowrap; }
+  .roster-table th{ position:sticky; top:0; background:#fff; z-index:2; }
+  .roster-table .sticky-col{ position:sticky; left:0; background:#fff; z-index:1; }
+  .cell-btn{ width:100%; border:0; background:transparent; text-align:left; cursor:pointer; padding:6px 8px; border-radius:10px; }
+  .cell-btn:hover{ background:rgba(2,6,23,.06); }
+  .badge{ display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid rgba(2,6,23,.12); }
+  .badge.ok{ background:rgba(16,185,129,.10); }
+  .badge.warn{ background:rgba(245,158,11,.12); }
+  .badge.err{ background:rgba(239,68,68,.10); }
+
+  /* Modal */
+  .modal-backdrop{ display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1000; }
+  .modal{ max-width:520px; margin:8vh auto; background:#fff; border-radius:18px; box-shadow:0 24px 80px rgba(2,6,23,.24); overflow:hidden; }
+  .modal-header{ padding:14px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(2,6,23,.10); }
+  .modal-body{ padding:14px 16px; }
+  .modal-footer{ padding:14px 16px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid rgba(2,6,23,.10); }
+  .xbtn{ border:0; background:transparent; font-size:18px; cursor:pointer; }
+  .select{ width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(2,6,23,.18); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">Tablero de turnos 24/7</h2>
+      <div class="small" style="margin-top:6px; color:var(--muted);">
+        Semana: <b>{{ ws|fecha }}</b> → <b>{{ we|fecha }}</b> · Grupo: <b>{{ group }}</b>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <form method="get" action="{{ url_for('modulos.turnos_tablero') }}" style="display:flex; gap:10px; align-items:center;">
+        <input type="date" name="week" value="{{ ws|fecha }}" class="input" style="min-width:170px;" />
+        <select name="group" class="input" style="min-width:220px;">
+          <option value="CABINA" {% if group == 'CABINA' %}selected{% endif %}>CABINA</option>
+          <option value="AJUSTADOR" {% if group == 'AJUSTADOR' %}selected{% endif %}>AJUSTADORES</option>
+        </select>
+        <button class="btn" type="submit">Ir</button>
+      </form>
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos') }}">Vista clásica</a>
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos_sesion', week=ws|fecha, group=group, day=ws|fecha) }}">Sesión 24h</a>
+    </div>
+  </div>
+
+  <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    {% if hdr and hdr.status %}
+      {% if hdr.status == 'PUBLISHED' %}
+        <span class="badge ok">✅ Publicada</span>
+      {% else %}
+        <span class="badge warn">📝 Borrador</span>
+      {% endif %}
+    {% endif %}
+
+    {% if validation.errors and validation.errors|length > 0 %}
+      <span class="badge err">⚠️ {{ validation.errors|length }} regla(s) incumplida(s)</span>
+    {% endif %}
+
+    {% if validation.warnings and validation.warnings|length > 0 %}
+      <span class="badge warn">ℹ️ {{ validation.warnings|length }} advertencia(s)</span>
+    {% endif %}
+
+    {% if hdr and hdr.status != 'PUBLISHED' %}
+      <form method="post" action="{{ url_for('modulos.turnos_tablero_publicar') }}" style="margin-left:auto;">
+        <input type="hidden" name="week_id" value="{{ week_id }}" />
+        <input type="hidden" name="group" value="{{ group }}" />
+        <button class="btn btn-primary" type="submit">Publicar semana</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if validation.errors and validation.errors|length > 0 %}
+  <div class="card" style="border-left:4px solid rgba(239,68,68,.5);">
+    <div style="font-weight:800; margin-bottom:8px;">Reglas incumplidas</div>
+    <ul style="margin:0; padding-left:18px;">
+      {% for e in validation.errors %}
+        <li class="small"><b>{{ e.rule }}</b>: {{ e.message }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+{% if validation.warnings and validation.warnings|length > 0 %}
+  <div class="card" style="border-left:4px solid rgba(245,158,11,.55);">
+    <div style="font-weight:800; margin-bottom:8px;">Advertencias</div>
+    <ul style="margin:0; padding-left:18px;">
+      {% for w in validation.warnings %}
+        <li class="small">{{ w.message }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="card">
+  <div class="grid-wrap">
+    <table class="roster-table">
+      <thead>
+        <tr>
+          <th class="sticky-col">Empleado</th>
+          {% for i in range(0,7) %}
+            {% set d = week_days[i] %}
+            <th>
+              {{ day_labels[i] }}<br>
+              <span class="small">{{ d|fecha }}</span>
+              <div style="margin-top:6px;">
+                <a class="btn btn-ghost" style="padding:6px 8px; font-size:12px;" href="{{ url_for('modulos.turnos_sesion', week=ws|fecha, group=group, day=d|fecha) }}">
+                  Sesión
+                </a>
+              </div>
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+          <tr>
+            <td class="sticky-col">
+              <div style="font-weight:800;">{{ emp.last_name }}, {{ emp.first_name }}</div>
+              <div class="small" style="color:var(--muted);">{{ emp.doc_number }}</div>
+            </td>
+            {% for i in range(0,7) %}
+              {% set d = week_days[i] %}
+              {% set cell = grid.get((emp.employee_id|int, d)) %}
+              {% set code = ((cell.code if cell and cell.code else (cell.notes if cell else '')) or '') %}
+              {% set sid = (cell.shift_id if cell else None) %}
+              {% set is_off = (cell.is_day_off if cell else 0) %}
+
+              <td>
+                <button
+                  class="cell-btn"
+                  type="button"
+                  data-employee-id="{{ emp.employee_id }}"
+                  data-employee-name="{{ emp.first_name }} {{ emp.last_name }}"
+                  data-work-date="{{ d|fecha }}"
+                  data-current="{{ code or (sid if sid else '') }}"
+                >
+                  {% if is_off and code %}
+                    <b>{{ code }}</b>
+                  {% elif code and code.startswith('1P/') %}
+                    <b>{{ code }}</b>
+                  {% elif sid %}
+                    {% for s in shifts %}
+                      {% if s.shift_id == sid %}
+                        <b>{{ s.shift_code }}</b>
+                        <span class="small" style="color:var(--muted);">{{ s.start_time.strftime('%H:%M') if s.start_time else '' }}-{{ s.end_time.strftime('%H:%M') if s.end_time else '' }}</span>
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    <span class="small" style="color:var(--muted);">—</span>
+                  {% endif %}
+                </button>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div>
+        <div id="modalTitle" style="font-weight:900;">Asignar</div>
+        <div class="small" id="modalMeta" style="color:var(--muted);"></div>
+      </div>
+      <button class="xbtn" type="button" id="modalClose">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('modulos.turnos_tablero_set') }}">
+      <div class="modal-body">
+        <input type="hidden" name="week_id" value="{{ week_id }}" />
+        <input type="hidden" name="group" value="{{ group }}" />
+        <input type="hidden" name="employee_id" id="fEmployeeId" />
+        <input type="hidden" name="work_date" id="fWorkDate" />
+
+        <label class="label">Valor (como Excel)</label>
+        <select class="select" name="value" id="fValue">
+          <option value="">— Vacío (eliminar) —</option>
+          <optgroup label="Códigos">
+            {% for o in special_options %}
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Turnos">
+            {% for o in shift_options %}
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Chequera (1P/turno)">
+            {% for o in half_options %}
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            {% endfor %}
+          </optgroup>
+        </select>
+
+        <div class="small" style="margin-top:10px; color:var(--muted);">
+          Tips: <b>DES</b>=descanso · <b>INC</b>=incapacidad · <b>VAC</b>=vacaciones · <b>HB</b>=cumpleaños · <b>1P/9</b>=medio permiso + turno 9.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" type="button" id="btnCancel">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const backdrop = document.getElementById('modalBackdrop');
+  const closeBtn = document.getElementById('modalClose');
+  const cancelBtn = document.getElementById('btnCancel');
+  const meta = document.getElementById('modalMeta');
+  const title = document.getElementById('modalTitle');
+
+  const fEmployeeId = document.getElementById('fEmployeeId');
+  const fWorkDate = document.getElementById('fWorkDate');
+  const fValue = document.getElementById('fValue');
+
+  function openModal(btn){
+    const empId = btn.dataset.employeeId;
+    const empName = btn.dataset.employeeName;
+    const workDate = btn.dataset.workDate;
+
+    title.textContent = 'Asignar turno';
+    meta.textContent = empName + ' · ' + workDate;
+
+    fEmployeeId.value = empId;
+    fWorkDate.value = workDate;
+    fValue.value = ''; // default delete
+
+    backdrop.style.display = 'block';
+  }
+
+  function closeModal(){
+    backdrop.style.display = 'none';
+  }
+
+  document.querySelectorAll('.cell-btn').forEach(btn => {
+    btn.addEventListener('click', () => openModal(btn));
+  });
+
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+
+  backdrop.addEventListener('click', (ev) => {
+    if(ev.target === backdrop) closeModal();
+  });
+})();
+</script>
+{% endblock %}

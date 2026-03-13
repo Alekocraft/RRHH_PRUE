@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional, List
+from typing import List, Optional
 
-from services.rrhh_db import fetch_all, fetch_one, execute
+from services.rrhh_db import execute, fetch_all, fetch_one
 
 
 # -----------------------------------------------------------------------------
@@ -22,6 +22,36 @@ def _has_col(schema: str, table: str, column: str) -> bool:
 
 def _hr_employee_has_col(col_name: str) -> bool:
     return _has_col("rrhh", "hr_employee", col_name)
+
+
+def _normalize_shift_group(value: str | None) -> str:
+    """Normaliza el grupo de turnos del empleado.
+
+    Grupos válidos (según BD / restricciones):
+      - ADMIN
+      - CABINA
+      - AJUSTADOR
+
+    Acepta aliases comunes:
+      - 'AJUSTADORES', 'AJUST...' -> AJUSTADOR
+      - 'CAB...' -> CABINA
+      - 'ADM...', 'ADMINISTRATIVO...' -> ADMIN
+
+    Si viene vacío o desconocido, cae en ADMIN.
+    """
+    s = (value or "").strip().upper()
+    if not s:
+        return "ADMIN"
+
+    if s.startswith("AJUST"):
+        return "AJUSTADOR"
+    if s.startswith("CAB"):
+        return "CABINA"
+    if s.startswith("ADM") or s.startswith("ADMIN"):
+        return "ADMIN"
+
+    # fallback seguro
+    return "ADMIN"
 
 
 # -----------------------------------------------------------------------------
@@ -84,6 +114,10 @@ def get_employee(employee_id: int):
     )
     if _hr_employee_has_col("can_work_from_home"):
         cols += ", can_work_from_home"
+    if _hr_employee_has_col("birth_date"):
+        cols += ", birth_date"
+    if _hr_employee_has_col("shift_group"):
+        cols += ", shift_group"
 
     return fetch_one(
         f"SELECT {cols} FROM rrhh.hr_employee WHERE employee_id = ?",
@@ -108,11 +142,16 @@ def upsert_employee_by_ad(
     position_name: Optional[str],
     is_exec_approval_by_hr: bool,
     can_work_from_home: bool = False,
+    birth_date: Optional[date] = None,
+    shift_group: str = "ADMIN",
 ) -> int:
     """Crea o actualiza un empleado usando ad_username (samAccountName).
 
     Compatible con llamadas previas que no enviaban can_work_from_home.
     Retorna employee_id.
+
+    Importante:
+    - No degradar AJUSTADOR a ADMIN (rompe el tablero de ajustadores).
     """
 
     sam = (sam or "").strip()
@@ -120,79 +159,91 @@ def upsert_employee_by_ad(
         raise ValueError("sam (ad_username) es obligatorio")
 
     has_wfh = _hr_employee_has_col("can_work_from_home")
+    has_bday = _hr_employee_has_col("birth_date")
+    has_shift_group = _hr_employee_has_col("shift_group")
+
+    shift_group_norm = _normalize_shift_group(shift_group) if has_shift_group else "ADMIN"
 
     # 1) Si ya existe por ad_username, actualizar
     e = fetch_one("SELECT employee_id FROM rrhh.hr_employee WHERE ad_username = ?", (sam,))
     if e:
+        sets = [
+            "doc_number=?",
+            "first_name=?",
+            "last_name=?",
+            "email=?",
+            "department=?",
+            "position_name=?",
+            "is_exec_approval_by_hr=?",
+            "is_active=1",
+        ]
+        params = [
+            doc_number,
+            first_name,
+            last_name,
+            email,
+            department,
+            position_name,
+            1 if is_exec_approval_by_hr else 0,
+        ]
+
         if has_wfh:
-            execute(
-                "UPDATE rrhh.hr_employee SET doc_number=?, first_name=?, last_name=?, email=?, department=?, position_name=?, "
-                "is_exec_approval_by_hr=?, can_work_from_home=?, is_active=1 "
-                "WHERE employee_id=?",
-                (
-                    doc_number,
-                    first_name,
-                    last_name,
-                    email,
-                    department,
-                    position_name,
-                    1 if is_exec_approval_by_hr else 0,
-                    1 if can_work_from_home else 0,
-                    int(e.employee_id),
-                ),
-            )
-        else:
-            execute(
-                "UPDATE rrhh.hr_employee SET doc_number=?, first_name=?, last_name=?, email=?, department=?, position_name=?, "
-                "is_exec_approval_by_hr=?, is_active=1 "
-                "WHERE employee_id=?",
-                (
-                    doc_number,
-                    first_name,
-                    last_name,
-                    email,
-                    department,
-                    position_name,
-                    1 if is_exec_approval_by_hr else 0,
-                    int(e.employee_id),
-                ),
-            )
+            sets.append("can_work_from_home=?")
+            params.append(1 if can_work_from_home else 0)
+        if has_bday:
+            sets.append("birth_date=?")
+            params.append(birth_date)
+        if has_shift_group:
+            sets.append("shift_group=?")
+            params.append(shift_group_norm)
+
+        params.append(int(e.employee_id))
+        execute(
+            f"UPDATE rrhh.hr_employee SET {', '.join(sets)} WHERE employee_id=?",
+            tuple(params),
+        )
         return int(e.employee_id)
 
     # 2) Insertar
+    cols = [
+        "doc_number",
+        "first_name",
+        "last_name",
+        "email",
+        "department",
+        "position_name",
+        "is_exec_approval_by_hr",
+        "is_active",
+        "ad_username",
+    ]
+    vals = [
+        doc_number,
+        first_name,
+        last_name,
+        email,
+        department,
+        position_name,
+        1 if is_exec_approval_by_hr else 0,
+        1,
+        sam,
+    ]
+
+    # Insert dinámico por compatibilidad
     if has_wfh:
-        execute(
-            "INSERT INTO rrhh.hr_employee(doc_number, first_name, last_name, email, department, position_name, "
-            "is_exec_approval_by_hr, can_work_from_home, is_active, ad_username) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
-            (
-                doc_number,
-                first_name,
-                last_name,
-                email,
-                department,
-                position_name,
-                1 if is_exec_approval_by_hr else 0,
-                1 if can_work_from_home else 0,
-                sam,
-            ),
-        )
-    else:
-        execute(
-            "INSERT INTO rrhh.hr_employee(doc_number, first_name, last_name, email, department, position_name, "
-            "is_exec_approval_by_hr, is_active, ad_username) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
-            (
-                doc_number,
-                first_name,
-                last_name,
-                email,
-                department,
-                position_name,
-                1 if is_exec_approval_by_hr else 0,
-                sam,
-            ),
-        )
+        cols.insert(7, "can_work_from_home")
+        vals.insert(7, 1 if can_work_from_home else 0)
+    if has_bday:
+        cols.insert(7, "birth_date")
+        vals.insert(7, birth_date)
+    if has_shift_group:
+        cols.insert(7, "shift_group")
+        vals.insert(7, shift_group_norm)
+
+    placeholders = ", ".join(["?"] * len(cols))
+    execute(
+        f"INSERT INTO rrhh.hr_employee({', '.join(cols)}) VALUES ({placeholders})",
+        tuple(vals),
+    )
 
     new_row = fetch_one(
         "SELECT TOP 1 employee_id FROM rrhh.hr_employee WHERE ad_username = ? ORDER BY employee_id DESC",

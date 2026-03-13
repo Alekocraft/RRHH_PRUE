@@ -5,7 +5,7 @@ def _bool(env_value, default=False) -> bool:
         return default
     return (f"{env_value}").strip().lower() in ("1", "true", "yes", "y", "on")
 
-RRHH_DB_DSN = os.getenv("RRHH_DB_DSN", "").strip()  # opcional
+RRHH_DB_DSN = os.getenv("RRHH_DB_DSN", "").strip()   
 
 RRHH_DB_DRIVER = os.getenv("RRHH_DB_DRIVER", "ODBC Driver 17 for SQL Server")
 RRHH_DB_SERVER = os.getenv("RRHH_DB_SERVER", r"localhost\SQLEXPRESS")

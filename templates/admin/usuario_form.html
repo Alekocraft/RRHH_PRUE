@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+{% if mode == 'edit' %}
+  {% set page_title = 'Editar usuario y colaborador' %}
+{% else %}
+  {% set page_title = 'Crear usuario y colaborador' %}
+{% endif %}
+
+{% block title %}{{ page_title }} · RRHH{% endblock %}
+
+{% block content %}
+<style>
+  .mark{ display:inline-flex; width:18px; justify-content:center; font-weight:900; margin-right:6px; color:rgba(2,6,23,.55); }
+</style>
+<div class="card" style="max-width:1120px;">
+  <div class="card-header">
+    <div>
+      <div class="card-title">{{ page_title }}</div>
+      <div class="card-subtitle">
+        Unificado: <b>usuario AD</b>, <b>colaborador</b>, <b>roles</b> y <b>equipo operativo (Cabina/Ajustadores)</b>.
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <form method="post" id="userEmpForm">
+
+      <!-- Buscar en AD -->
+      <div style="position:relative; margin-bottom:14px;">
+        <label class="label">Buscar en AD</label>
+        <input class="input" id="adSearch" autocomplete="off" placeholder="Nombre, apellido o samAccountName"
+               value="{{ (form.get('ad_search') if form else '') or '' }}">
+        <div id="suggestions" class="card"
+             style="display:none; position:absolute; z-index:50; left:0; right:0; margin-top:8px; box-shadow:0 18px 45px rgba(15,23,42,.14);"></div>
+      </div>
+
+      <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="flex:1 1 720px; min-width:320px;">
+
+      <!-- Usuario / Roles -->
+      <div class="card" style="background:#fff; margin-bottom:14px;">
+        <div style="padding:12px 14px;">
+          <div style="font-weight:800; margin-bottom:10px;">Crear usuario</div>
+
+          <div class="form-row">
+            <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+              <label class="label">Usuario AD (samAccountName)<span style="color:red;">*</span></label>
+              <input class="input" id="ad_username" name="ad_username" required
+                     placeholder="ej: jperez" value="{{ (form.get('ad_username') if form else '') or (user.ad_username if user else '') or '' }}">
+              <div class="small" style="margin-top:6px; color:var(--muted);">Sin dominio. Ej: <b>jperez</b></div>
+            </div>
+            
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="small" style="color:var(--muted); margin-bottom:8px;">El rol <b>EMPLEADO</b> se asigna automáticamente.</div>
+            <div style="display:flex; gap:14px; flex-wrap:wrap;">
+              {% for r in roles_catalog %}
+                {% set checked = (form and form.get('role_' ~ r.role_code)) or (user and (r.role_code in user.roles)) %}
+                {% set locked = (lock_admin and r.role_code == 'ADMINISTRADOR') or (lock_rrhh and r.role_code == 'RRHH') %}
+                <label class="small" style="display:flex; align-items:center; gap:8px; opacity:{{ '0.85' if locked else '1' }};">
+                  <input type="checkbox" name="role_{{ r.role_code }}" {% if checked %}checked{% endif %} {% if locked %}disabled{% endif %}>
+                  {{ r.role_name }}
+                  {% if locked %}<span class="small" style="color:var(--muted);">(fijo)</span>{% endif %}
+                </label>
+              {% endfor %}
+
+              <label class="small" title="Permite solicitar trabajo remoto"
+                     style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" name="can_work_from_home" id="can_work_from_home"
+                       {% if form and form.get('can_work_from_home') %}checked{% endif %}>
+                Trabajo en casa
+              </label>
+
+              <label class="small" title="El flujo inicia en RRHH"
+                     style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" name="is_exec_approval_by_hr" id="is_exec_approval_by_hr"
+                       {% if form and form.get('is_exec_approval_by_hr') %}checked{% endif %}>
+                Requiere aprobación RRHH (ejecutivos)
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Asociación de colaborador -->
+      <div class="card" style="background:#fff; margin-bottom:14px;">
+        <div style="padding:12px 14px;">
+          <div style="font-weight:800; margin-bottom:10px;">Crear colaborador</div>
+          <div class="small" style="color:var(--muted); margin-bottom:10px;">
+            Escribe <b>mínimo 3 caracteres</b>, selecciona el usuario y valida la información antes de guardar.
+          </div>
+
+          <div class="form-row">
+            <div style="flex:1 1 100%; min-width:260px;">
+              <label class="label">Empleado asociado (opcional)</label>
+              <select class="input" id="employee_mode" name="employee_mode">
+                {% set em = (form.get('employee_mode') if form else '') or 'NEW' %}
+                <option value="NEW" {% if em == 'NEW' %}selected{% endif %}>— Crear/actualizar colaborador con estos datos —</option>
+                <option value="" {% if em == '' %}selected{% endif %}>— Sin asociar —</option>
+                <option disabled>──────────</option>
+                {% for e in empleados %}
+                  <option value="{{ e.employee_id }}" {% if em and em|string == e.employee_id|string %}selected{% endif %}>
+                    {{ (e.doc_number or 's/cc') }} · {{ e.last_name }}, {{ e.first_name }}{% if e.ad_username %} · {{ e.ad_username }}{% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Datos colaborador -->
+          <div id="empFields">
+            <div class="form-row">
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Cédula <span style="color:red;">*</span></label>
+                <input class="input" id="doc_number" name="doc_number" value="{{ (form.get('doc_number') if form else '') or '' }}">
+              </div>
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Fecha de cumpleaños <span style="color:red;">*</span></label>
+                <input class="input" type="date" id="birth_date" name="birth_date" value="{{ (form.get('birth_date') if form else '') or '' }}">
+                <div class="small" style="margin-top:6px; color:var(--muted);">Se usa para el beneficio del <b>día de cumpleaños</b> (Chequera de tiempo).</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Nombres <span style="color:red;">*</span></label>
+                <input class="input" id="first_name" name="first_name" value="{{ (form.get('first_name') if form else '') or '' }}">
+              </div>
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Apellidos <span style="color:red;">*</span></label>
+                <input class="input" id="last_name" name="last_name" value="{{ (form.get('last_name') if form else '') or '' }}">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Dirección de correo electrónico</label>
+                <input class="input" id="email" name="email" value="{{ (form.get('email') if form else '') or '' }}">
+              </div>
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Área / Departamento</label>
+                <input class="input" id="department" name="department" value="{{ (form.get('department') if form else '') or '' }}">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Cargo</label>
+                <input class="input" id="position_name" name="position_name" value="{{ (form.get('position_name') if form else '') or '' }}">
+              </div>
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Equipo operativo (Tablero 24/7) <span style="color:red;">*</span></label>
+                {% set sg = ((form.get('shift_group') if form else '') or '') %}
+                <select class="input" id="shift_group" name="shift_group">
+                  <option value="" {% if not sg %}selected{% endif %}>— Seleccionar —</option>
+                  <option value="CABINA" {% if sg == 'CABINA' %}selected{% endif %}>Cabina</option>
+                  <option value="AJUSTADOR" {% if sg == 'AJUSTADOR' %}selected{% endif %}>Ajustadores</option>
+                  <option value="ADMIN" {% if sg == 'ADMIN' %}selected{% endif %}>Administrativo (no aparece en turnos)</option>
+                </select>
+                <div class="small" style="margin-top:6px; color:var(--muted);">
+                  Define en qué tablero aparece el colaborador. Para cuadrar operación 24/7 usa <b>Cabina</b> o <b>Ajustadores</b>.
+                </div>
+              </div>
+            </div>
+
+            <!-- Horario (turno base) + Cambio de horario (Hora flexible) -->
+            <div class="form-row">
+              <div style="flex:1 1 100%; min-width:260px;">
+                <label class="label">Horario (turno base) <span style="color:red;">*</span></label>
+                {% set bsid = ((form.get('base_shift_id') if form else '') or '') %}
+                <select class="input" id="base_shift_id" name="base_shift_id">
+                  <option value="" {% if not bsid %}selected{% endif %}>— Seleccionar turno —</option>
+                  {% for s in (shifts_catalog or []) %}
+                    {% set st = (s.start_time.strftime('%H:%M') if s.start_time else '') %}
+                    {% set et = (s.end_time.strftime('%H:%M') if s.end_time else '') %}
+                    {% set label = (s.shift_code or '') ~ ((' · ' ~ st ~ '-' ~ et) if (st or et) else '') %}
+                    <option value="{{ s.shift_id }}" {% if bsid and bsid|string == s.shift_id|string %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <div class="small" style="margin-top:6px; color:var(--muted);">
+                  Obligatorio para Cabina/Ajustadores. Se usa como <b>turno base</b> para cruces en Asistencia.
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Vigencia desde</label>
+                <input class="input" type="date" id="base_shift_valid_from" name="base_shift_valid_from"
+                       value="{{ (form.get('base_shift_valid_from') if form else '') or '' }}">
+              </div>
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Vigencia hasta (opcional)</label>
+                <input class="input" type="date" id="base_shift_valid_to" name="base_shift_valid_to"
+                       value="{{ (form.get('base_shift_valid_to') if form else '') or '' }}">
+              </div>
+            </div>
+
+            <div class="card" style="background:rgba(2,6,23,.02); border:1px dashed rgba(2,6,23,.12); margin-top:10px;">
+              <div style="padding:12px 14px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <div style="font-weight:800;">Cambio de horario (Hora flexible)</div>
+                  {% if flex_enabled %}
+                    <label class="small" style="display:flex; align-items:center; gap:8px;">
+                      <input type="checkbox" id="flex_apply" name="flex_apply" {% if form and form.get('flex_apply') %}checked{% endif %}>
+                      Aplicar
+                    </label>
+                  {% endif %}
+                </div>
+                {% if not flex_enabled %}
+                  <div class="small" style="margin-top:6px; color:var(--muted);">Hora flexible no está disponible (faltan tablas en BD).</div>
+                {% else %}
+                  <div class="form-row" style="margin-top:10px;">
+                    <div style="flex:1 1 calc(33% - 10px); min-width:180px;">
+                      <label class="label">Día</label>
+                      {% set fwd = (form.get('flex_weekday') if form else '') or '' %}
+                      <select class="input" id="flex_weekday" name="flex_weekday">
+                        <option value="" {% if not fwd %}selected{% endif %}>—</option>
+                        <option value="1" {% if fwd=='1' %}selected{% endif %}>Lunes</option>
+                        <option value="2" {% if fwd=='2' %}selected{% endif %}>Martes</option>
+                        <option value="3" {% if fwd=='3' %}selected{% endif %}>Miércoles</option>
+                        <option value="4" {% if fwd=='4' %}selected{% endif %}>Jueves</option>
+                        <option value="5" {% if fwd=='5' %}selected{% endif %}>Viernes</option>
+                        <option value="6" {% if fwd=='6' %}selected{% endif %}>Sábado</option>
+                        <option value="7" {% if fwd=='7' %}selected{% endif %}>Domingo</option>
+                      </select>
+                    </div>
+                    <div style="flex:1 1 calc(33% - 10px); min-width:180px;">
+                      <label class="label">AM/PM</label>
+                      {% set fslot = (form.get('flex_slot') if form else '') or '' %}
+                      <select class="input" id="flex_slot" name="flex_slot">
+                        <option value="" {% if not fslot %}selected{% endif %}>—</option>
+                        <option value="AM" {% if fslot=='AM' %}selected{% endif %}>AM</option>
+                        <option value="PM" {% if fslot=='PM' %}selected{% endif %}>PM</option>
+                      </select>
+                    </div>
+                    <div style="flex:1 1 calc(33% - 10px); min-width:180px;">
+                      <label class="label">Desde</label>
+                      <input class="input" type="date" id="flex_valid_from" name="flex_valid_from"
+                             value="{{ (form.get('flex_valid_from') if form else '') or '' }}">
+                    </div>
+                  </div>
+                  <div class="small" style="margin-top:6px; color:var(--muted);">
+                    El colaborador puede solicitar cambios; el flujo requiere aprobación de <b>Jefe</b> y <b>RRHH</b>.
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div style="flex:1 1 calc(50% - 10px); min-width:260px;">
+                <label class="label">Jefe inmediato (asignación)</label>
+                <select class="input" id="manager_employee_id" name="manager_employee_id">
+                  <option value="">— Seleccionar —</option>
+                  {% set cur_mgr = (form.get('manager_employee_id') if form else '') or '' %}
+                  {% for m in managers %}
+                    <option value="{{ m.employee_id }}" data-sam="{{ (m.ad_username or '') }}" {% if cur_mgr and cur_mgr|string == m.employee_id|string %}selected{% endif %}>
+                      {{ m.last_name }}, {{ m.first_name }}{% if m.doc_number %} · {{ m.doc_number }}{% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+                <div id="managerHint" style="margin-top:6px; font-size:12px; color:var(--muted);"></div>
+              </div>
+            </div>
+</div>
+        </div>
+      </div>
+        </div>
+        <div style="flex:0 0 340px; min-width:280px;">
+          <div class="card" style="background:#fff; position:sticky; top:88px;">
+            <div style="padding:12px 14px;">
+              <div style="font-weight:800; margin-bottom:8px;">📋 Checklist</div>
+              <div class="small" style="color:var(--muted); margin-bottom:10px;">Todo lo importante en un solo lugar.</div>
+
+              <div class="small" style="font-weight:800; margin:10px 0 6px;">Obligatorio</div>
+              <ul style="list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr; gap:8px;">
+                <li data-check="ad"><span class="mark">•</span> Usuario AD (*)</li>
+<li data-check="doc"><span class="mark">•</span> Cédula (*)</li>
+                <li data-check="name"><span class="mark">•</span> Nombres y apellidos (*)</li>
+                <li data-check="bday"><span class="mark">•</span> Cumpleaños (*)</li>
+                <li data-check="grp"><span class="mark">•</span> Equipo operativo 24/7 (*)</li>
+                <li data-check="shift"><span class="mark">•</span> Horario (turno base) (*)</li>
+              </ul>
+
+              <div class="small" style="font-weight:800; margin:12px 0 6px;">Recomendado</div>
+              <ul style="list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr; gap:8px;">
+                <li data-check="mgr"><span class="mark">•</span> Jefe inmediato</li>
+                <li data-check="mail"><span class="mark">•</span> Correo</li>
+                <li data-check="dept"><span class="mark">•</span> Área / Departamento</li>
+                <li data-check="pos"><span class="mark">•</span> Cargo</li>
+              </ul>
+
+<div class="small" style="margin-top:12px;">💡 Si no se asigna jefe, el flujo usa RRHH como respaldo.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+        <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuarios_listar') }}">Cancelar</a>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const input = document.getElementById('adSearch');
+  const box = document.getElementById('suggestions');
+  const modeSel = document.getElementById('employee_mode');
+  const empFields = document.getElementById('empFields');
+  const $ = (id) => document.getElementById(id);
+
+  function onlyDigits(v){
+    const s = String(v || '').trim();
+    const d = s.replace(/\D+/g,'');
+    return d || '';
+  }
+
+  function emptyNode(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+  function clearSuggestions(){ box.style.display='none'; emptyNode(box); }
+
+  function setOk(key, ok){
+    const li = document.querySelector('[data-check="'+key+'"]');
+    if(!li) return;
+    const mark = li.querySelector('.mark');
+    if(!mark) return;
+    mark.textContent = ok ? '✓' : '•';
+    li.style.opacity = ok ? '1' : '.75';
+  }
+
+  function updateChecklist(){
+    const isNew = (modeSel.value || 'NEW') === 'NEW';
+    setOk('ad', ($('ad_username').value||'').trim().length>0);    if(!isNew){
+      // si no vamos a crear/actualizar colaborador, no obligamos checklist
+      setOk('doc', true); setOk('name', true); setOk('bday', true); setOk('grp', true); setOk('shift', true);
+      setOk('mail', true); setOk('dept', true); setOk('pos', true); setOk('mgr', true);
+    } else {
+      setOk('doc', ($('doc_number').value||'').trim().length>0);
+      setOk('name', ($('first_name').value||'').trim().length>0 && ($('last_name').value||'').trim().length>0);
+      setOk('bday', ($('birth_date').value||'').trim().length>0);
+      const g = ($('shift_group').value||'').trim();
+      setOk('grp', g==='CABINA' || g==='AJUSTADOR' || g==='ADMIN');
+      const needShift = (g==='CABINA' || g==='AJUSTADOR');
+      const bs = ($('base_shift_id') && ($('base_shift_id').value||'').trim()) || '';
+      setOk('shift', (!needShift) || bs.length>0);
+      setOk('mail', ($('email').value||'').trim().length>0);
+      setOk('dept', ($('department').value||'').trim().length>0);
+      setOk('pos', ($('position_name').value||'').trim().length>0);
+    }
+    if(isNew){
+      setOk('mgr', ($('manager_employee_id').value||'').trim().length>0);
+    }
+  }
+
+  function toggleEmpFields(){
+    const isNew = (modeSel.value || 'NEW') === 'NEW';
+    empFields.style.display = isNew ? 'block' : 'none';
+    updateChecklist();
+  }
+
+
+  function renderError(msg){
+    const div = document.createElement('div');
+    div.style.padding = '10px 12px';
+    div.style.borderTop = '1px solid rgba(2,6,23,.08)';
+    div.style.background = 'rgba(239,68,68,.06)';
+    const title = document.createElement('div');
+    title.style.fontWeight = '800';
+    title.textContent = 'No se pudo consultar el Directorio Activo';
+    div.appendChild(title);
+    const meta = document.createElement('div');
+    meta.style.fontSize = '12px';
+    meta.style.color = 'var(--muted)';
+    meta.style.marginTop = '6px';
+    meta.textContent = String(msg || 'LDAP/AD no disponible.');
+    div.appendChild(meta);
+    const hint = document.createElement('div');
+    hint.style.fontSize = '12px';
+    hint.style.marginTop = '8px';
+    hint.style.color = 'var(--muted)';
+    hint.textContent = 'Revisa variables de entorno: LDAP_SERVER, LDAP_SEARCH_BASE, LDAP_SERVICE_USER, LDAP_SERVICE_PASSWORD (y LDAP_USE_SSL/LDAP_PORT si aplica).';
+    div.appendChild(hint);
+    return div;
+  }
+
+  function renderItem(it){
+    const div = document.createElement('div');
+    div.style.padding = '10px 12px';
+    div.style.cursor = 'pointer';
+    div.style.borderTop = '1px solid rgba(2,6,23,.08)';
+
+    const title = document.createElement('div');
+    title.style.fontWeight = '700';
+    title.textContent = it.display_name || ((it.first_name||'')+' '+(it.last_name||'')).trim();
+    div.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.style.fontSize = '12px';
+    meta.style.color = 'var(--muted)';
+    meta.style.marginTop = '3px';
+    const dn = onlyDigits(it.doc_number);
+    const parts = [];
+    if(it.sam) parts.push(it.sam);
+    if(dn) parts.push('Cédula: '+dn);
+    if(it.department) parts.push(it.department);
+    if(it.title) parts.push(it.title);
+    meta.textContent = parts.join(' · ');
+    div.appendChild(meta);
+
+    div.addEventListener('click', ()=>selectItem(it));
+    return div;
+  }
+
+  function selectItem(it){
+    $('ad_username').value = it.sam || '';
+    $('first_name').value = it.first_name || '';
+    $('last_name').value = it.last_name || '';
+    $('email').value = it.mail || '';
+    $('doc_number').value = onlyDigits(it.doc_number);
+    $('department').value = it.department || '';
+    $('position_name').value = it.title || '';
+
+    if(it.manager_sam){
+      const opts = Array.from($('manager_employee_id').options);
+      const match = opts.find(o => (o.dataset && o.dataset.sam || '').toLowerCase() === String(it.manager_sam).toLowerCase());
+      if(match){ $('manager_employee_id').value = match.value; }
+      const hint = $('managerHint');
+      emptyNode(hint);
+      hint.appendChild(document.createTextNode('Jefe detectado en AD: '));
+      const b = document.createElement('b');
+      b.textContent = String(it.manager_sam || '');
+      hint.appendChild(b);
+      hint.appendChild(document.createTextNode(' (si existe en el portal se preselecciona).'));
+    } else {
+      $('managerHint').textContent = '';
+    }
+
+    clearSuggestions();
+    updateChecklist();
+  }
+
+  let timer = null;
+  async function doSearch(q){
+    try{
+      const resp = await fetch('/admin/ldap/search?q='+encodeURIComponent(q));
+      const data = await resp.json();
+      emptyNode(box);
+
+      if(data && data.error){
+        box.appendChild(renderError(data.error));
+        box.style.display = 'block';
+        return;
+      }
+
+      const items = (data && data.items) ? data.items : [];
+      if(items.length===0){ clearSuggestions(); return; }
+      items.forEach(it=>box.appendChild(renderItem(it)));
+      box.style.display = 'block';
+    }catch(err){
+      emptyNode(box);
+      box.appendChild(renderError(err && err.message ? err.message : String(err||'')));
+      box.style.display = 'block';
+    }
+  }
+
+  input && input.addEventListener('input', (e)=>{
+    const q = String(e.target.value || '').trim();
+    if(q.length < 3){ clearSuggestions(); return; }
+    if(timer) clearTimeout(timer);
+    timer = setTimeout(()=>doSearch(q), 220);
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!box.contains(e.target) && e.target !== input){ clearSuggestions(); }
+  });
+
+  ['ad_username','doc_number','first_name','last_name','birth_date','shift_group','base_shift_id','manager_employee_id'].forEach(id=>{
+    const el = $(id);
+    if(el) el.addEventListener('change', updateChecklist);
+    if(el) el.addEventListener('keyup', updateChecklist);
+  });
+
+  modeSel && modeSel.addEventListener('change', toggleEmpFields);
+  toggleEmpFields();
+})();
+</script>
+{% endblock %}

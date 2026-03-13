@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Vista por horas · Turnos{% endblock %}
+
+{% block head %}
+<style>
+  .wrap{ overflow:auto; }
+  .hour-table{ border-collapse:collapse; width:max-content; min-width:100%; }
+  .hour-table th, .hour-table td{ border:1px solid rgba(2,6,23,.10); padding:6px 6px; font-size:12px; white-space:nowrap; }
+  .hour-table th{ position:sticky; top:0; background:#fff; z-index:2; }
+  .hour-table .sticky{ position:sticky; left:0; background:#fff; z-index:1; }
+  .hour-table .sticky2{ position:sticky; left:220px; background:#fff; z-index:1; }
+  .empcol{ min-width:220px; max-width:220px; }
+  .doccol{ min-width:120px; max-width:120px; }
+
+  .hcell{ min-width:42px; text-align:center; padding:0; }
+  .hbtn{ width:100%; height:28px; border:0; background:transparent; cursor:pointer; border-radius:8px; }
+  .hbtn:hover{ background:rgba(2,6,23,.06); }
+
+  .slot-shift{ background:rgba(16,185,129,.10); }
+  .slot-off{ background:rgba(148,163,184,.18); }
+  .slot-empty{ background:transparent; }
+
+  .cov{ font-weight:800; }
+  .cov.ok{ background:rgba(16,185,129,.10); }
+  .cov.bad{ background:rgba(239,68,68,.10); }
+  .cov.na{ background:rgba(2,6,23,.04); color:var(--muted); }
+
+  /* Modal */
+  .modal-backdrop{ display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1000; }
+  .modal{ max-width:560px; margin:8vh auto; background:#fff; border-radius:18px; box-shadow:0 24px 80px rgba(2,6,23,.24); overflow:hidden; }
+  .modal-header{ padding:14px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(2,6,23,.10); }
+  .modal-body{ padding:14px 16px; }
+  .modal-footer{ padding:14px 16px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid rgba(2,6,23,.10); }
+  .xbtn{ border:0; background:transparent; font-size:18px; cursor:pointer; }
+  .select{ width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(2,6,23,.18); }
+  .chips{ margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ border:1px solid rgba(2,6,23,.14); background:#fff; border-radius:999px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .chip:hover{ background:rgba(2,6,23,.06); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">Vista por horas (01–24)</h2>
+      <div class="small" style="margin-top:6px; color:var(--muted);">
+        Semana: <b>{{ ws|fecha }}</b> → <b>{{ we|fecha }}</b>
+        · Grupo: <b>{{ 'CABINA' if group=='CABINA' else 'AJUSTADORES' }}</b>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos_mes', month=ws.strftime('%Y-%m'), group=group) }}">Vista mensual</a>
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos_tablero', week=ws|fecha, group=group) }}">← Tablero semanal</a>
+      <a class="btn btn-ghost" href="{{ url_for('modulos.turnos_cobertura', group=group) }}">Cobertura 24/7</a>
+    </div>
+  </div>
+
+  <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <span class="small" style="color:var(--muted);">Día:</span>
+    {% for i in range(0,7) %}
+      {% set d = week_days[i] %}
+      {% set active = (d == day_date) %}
+      <a class="btn {{ 'btn-primary' if active else 'btn-ghost' }}" href="{{ url_for('modulos.turnos_horas', week=ws|fecha, group=group, day=d|fecha) }}">
+        {{ day_labels[i] }} <span class="small">{{ d|fecha }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="small" style="margin-top:10px; color:var(--muted);">
+    Tip: esta vista te deja “leer” el día por horas. Haz clic en cualquier hora de un empleado para asignar el turno del día.
+  </div>
+</div>
+
+<div class="card">
+  <div class="wrap">
+    <table class="hour-table">
+      <thead>
+        <tr>
+          <th class="sticky empcol">Empleado</th>
+          <th class="sticky2 doccol">Documento</th>
+          {% for h in hour_labels %}
+            <th class="hcell">{{ h }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          <th class="sticky empcol cov">Cobertura</th>
+          <th class="sticky2 doccol cov">Asign./Req.</th>
+          {% for i in range(0,24) %}
+            {% set a = coverage_assigned[i] %}
+            {% set r = coverage_required[i] %}
+            {% if r and a < r %}
+              {% set cls = 'bad' %}
+            {% elif r %}
+              {% set cls = 'ok' %}
+            {% else %}
+              {% set cls = 'na' %}
+            {% endif %}
+            <th class="hcell cov {{ cls }}">
+              {% if r %}
+                {{ a }}/{{ r }}
+              {% else %}
+                {{ a }}
+              {% endif %}
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees %}
+          <tr>
+            <td class="sticky empcol">
+              <div style="font-weight:800;">{{ emp.name }}</div>
+            </td>
+            <td class="sticky2 doccol">
+              <span class="small" style="color:var(--muted);">{{ emp.doc }}</span>
+            </td>
+            {% for i in range(0,24) %}
+              {% set s = emp.slots[i] %}
+              {% set kind = s.kind %}
+              {% set label = s.label %}
+              <td class="hcell {% if kind=='SHIFT' %}slot-shift{% elif kind=='OFF' %}slot-off{% else %}slot-empty{% endif %}">
+                <button
+                  class="hbtn"
+                  type="button"
+                  data-employee-id="{{ emp.employee_id }}"
+                  data-employee-name="{{ emp.name }}"
+                  data-work-date="{{ day_date|fecha }}"
+                  data-hour="{{ i }}"
+                >
+                  {% if label and s.start %}<b>{{ label }}</b>{% endif %}
+                </button>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div>
+        <div id="modalTitle" style="font-weight:900;">Asignar</div>
+        <div class="small" id="modalMeta" style="color:var(--muted);"></div>
+      </div>
+      <button class="xbtn" type="button" id="modalClose">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('modulos.turnos_tablero_set') }}">
+      <div class="modal-body">
+        <input type="hidden" name="week_id" value="{{ week_id }}" />
+        <input type="hidden" name="group" value="{{ group }}" />
+        <input type="hidden" name="employee_id" id="fEmployeeId" />
+        <input type="hidden" name="work_date" id="fWorkDate" />
+
+        <!-- Para volver a esta vista -->
+        <input type="hidden" name="return_to" value="horas" />
+        <input type="hidden" name="day" value="{{ day_date|fecha }}" />
+
+        <label class="label">Valor (como Excel)</label>
+        <select class="select" name="value" id="fValue">
+          <option value="">— Vacío (eliminar) —</option>
+          <optgroup label="Códigos">
+            {% for o in special_options %}
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Turnos">
+            {% for o in shift_options %}
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Chequera (1P/turno)">
+            {% for o in half_options %}
+              <option value="{{ o.value }}">{{ o.label }}</option>
+            {% endfor %}
+          </optgroup>
+        </select>
+
+        <div class="small" style="margin-top:10px; color:var(--muted);">
+          Turnos sugeridos para la hora seleccionada:
+        </div>
+        <div id="chipWrap" class="chips"></div>
+
+        <div class="small" style="margin-top:10px; color:var(--muted);">
+          Tips: <b>DES</b>=descanso · <b>INC</b>=incapacidad · <b>VAC</b>=vacaciones · <b>HB</b>=cumpleaños · <b>1P/9</b>=medio permiso + turno 9.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" type="button" id="btnCancel">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const backdrop = document.getElementById('modalBackdrop');
+  const closeBtn = document.getElementById('modalClose');
+  const cancelBtn = document.getElementById('btnCancel');
+  const meta = document.getElementById('modalMeta');
+  const title = document.getElementById('modalTitle');
+  const chipWrap = document.getElementById('chipWrap');
+
+  const fEmployeeId = document.getElementById('fEmployeeId');
+  const fWorkDate = document.getElementById('fWorkDate');
+  const fValue = document.getElementById('fValue');
+
+  const shifts = [
+    {% for s in shifts %}
+      {
+        code: "{{ s.shift_code }}",
+        start: "{{ s.start_time.strftime('%H:%M') if s.start_time else '' }}",
+        end: "{{ s.end_time.strftime('%H:%M') if s.end_time else '' }}"
+      }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  function toMin(hhmm){
+    if(!hhmm) return null;
+    const parts = hhmm.split(':');
+    if(parts.length < 2) return null;
+    return (parseInt(parts[0],10)*60) + parseInt(parts[1],10);
+  }
+
+  function coversHour(shift, hourIdx){
+    const sm = toMin(shift.start);
+    const em0 = toMin(shift.end);
+    if(sm === null || em0 === null) return false;
+    let em = em0;
+    const hs = hourIdx*60;
+    const he = (hourIdx+1)*60;
+    if(em <= sm){
+      // crosses midnight: [sm,1440) U [0,em)
+      return (hs < em) || (he > sm);
+    }
+    return (hs < em) && (he > sm);
+  }
+
+  function openModal(btn){
+    const empId = btn.dataset.employeeId;
+    const empName = btn.dataset.employeeName;
+    const workDate = btn.dataset.workDate;
+    const hour = parseInt(btn.dataset.hour, 10);
+
+    title.textContent = 'Asignar turno';
+    meta.textContent = empName + ' · ' + workDate + ' · Hora: ' + String(hour+1).padStart(2,'0');
+
+    fEmployeeId.value = empId;
+    fWorkDate.value = workDate;
+    fValue.value = '';
+
+    // Build suggested shift chips
+    chipWrap.innerHTML = '';
+    const sugg = shifts.filter(s => coversHour(s, hour)).slice(0, 10);
+    if(sugg.length === 0){
+      const sp = document.createElement('span');
+      sp.className = 'small';
+      sp.style.color = 'var(--muted)';
+      sp.textContent = '—';
+      chipWrap.appendChild(sp);
+    } else {
+      sugg.forEach(s => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = s.code + ' (' + s.start + '-' + s.end + ')';
+        b.addEventListener('click', () => { fValue.value = s.code; });
+        chipWrap.appendChild(b);
+      });
+    }
+
+    backdrop.style.display = 'block';
+  }
+
+  function closeModal(){ backdrop.style.display = 'none'; }
+
+  document.querySelectorAll('.hbtn').forEach(btn => {
+    btn.addEventListener('click', () => openModal(btn));
+  });
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) closeModal(); });
+})();
+</script>
+{% endblock %}

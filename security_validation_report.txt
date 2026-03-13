@@ -1,0 +1,113 @@
+SECURITY VALIDATION REPORT
+================================================================================
+Root: C:\Users\sinventarios\source\repos\rrhh_prue
+Total findings: 19
+
+Resumen por regla:
+  -  16  CWE-209: Avoid sensitive information exposure through error messages
+  -   2  CWE-1022: External link target=_blank without rel=noopener noreferrer
+  -   1  CWE-79: XSS (DOM sink usage)
+
+Resumen por archivo (top 20):
+  -   8  blueprints/modulos_asistencia.py
+  -   4  blueprints/admin_rrhh.py
+  -   4  services/ldap_directory.py
+  -   2  templates/modulos/asistencia_detalle.html
+  -   1  templates/modulos/turnos_horas.html
+
+Detalle:
+--------------------------------------------------------------------------------
+[ERROR] CWE-1022: External link target=_blank without rel=noopener noreferrer
+  templates/modulos/asistencia_detalle.html:12
+  Encontrado target="_blank" sin rel="noopener noreferrer".
+  >0012:       <a class="btn btn-secondary" target="_blank" href="{{ url_for('modulos.asistencia_detalle_export', fmt='excel', employee_id=emp.employee_id, year=year, month=month) }}">Exportar Excel</a>
+
+[ERROR] CWE-1022: External link target=_blank without rel=noopener noreferrer
+  templates/modulos/asistencia_detalle.html:13
+  Encontrado target="_blank" sin rel="noopener noreferrer".
+  >0013:       <a class="btn btn-secondary" target="_blank" href="{{ url_for('modulos.asistencia_detalle_export', fmt='pdf', employee_id=emp.employee_id, year=year, month=month) }}">Exportar PDF</a>
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/admin_rrhh.py:255
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0255:             flash(str(ex), "warning")
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/admin_rrhh.py:459
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0459:             flash(str(ex), "warning")
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/admin_rrhh.py:489
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0489:                     "manager_employee_id": str(cur_mgr_id) if cur_mgr_id else "",
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/admin_rrhh.py:656
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0656:         msg = str(ex)
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:114
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0114:         joined = " ".join([str(v).lower() for v in vals if v is not None])
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:158
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0158:         raw = {"row": [str(x) if x is not None else "" for x in r]}
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:920
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0920:                 out.append([d.isoformat(), "CASA", f"Trabajo en casa (req {required} min)", "", "", str(required)])
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:922
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0922:                 out.append([d.isoformat(), "F", f"Faltante (req {required} min)", "", "", str(required)])
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:928
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0928:             out.append([d.isoformat(), st, f"Cumple (req {required} min)", str(att.first_in or ""), str(att.last_out or ""), str(mins)])
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:930
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0930:             out.append([d.isoformat(), "I", f"Incompleto (req {required} min)", str(att.first_in or ""), str(att.last_out or ""), str(mins)])
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:1270
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >1270:             if total_minutes is not None and str(total_minutes).strip() != "":
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  blueprints/modulos_asistencia.py:1271
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >1271:                 mins = int(float(str(total_minutes).strip()))
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  services/ldap_directory.py:88
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0088:     ldap3 expone EntryAttribute con .value o .values. En algunos casos str(attr)
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  services/ldap_directory.py:125
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0125:         s = str(v).strip()
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  services/ldap_directory.py:187
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0187:             ps = str(p)
+
+[ERROR] CWE-209: Avoid sensitive information exposure through error messages
+  services/ldap_directory.py:191
+  Fuga de detalle técnico detectada en error/log: str(e)
+  >0191:             ps = str(p)
+
+[ERROR] CWE-79: XSS (DOM sink usage)
+  templates/modulos/turnos_horas.html:260
+  Uso de sink DOM potencialmente peligroso (\binnerHTML\s*=\s*[^;]+).
+  >0260:     chipWrap.innerHTML = '';

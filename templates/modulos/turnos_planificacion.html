@@ -1,0 +1,941 @@
+{% extends "base.html" %}
+
+{% block title %}Planificación semanal · Turnos{% endblock %}
+
+{% block head %}
+<style>
+  .planner-layout{ display:flex; gap:14px; align-items:stretch; }
+  .planner-left{ width:320px; min-width:260px; max-width:380px; }
+  .planner-right{ flex:1; min-width:820px; }
+
+  .panel{ background:#fff; border:1px solid rgba(0,0,0,.10); border-radius:16px; padding:12px; }
+  .panel h3{ margin:0 0 10px 0; }
+
+  .emp-search{ width:100%; }
+  .emp-list{ margin-top:10px; max-height:520px; overflow:auto; border-top:1px solid rgba(0,0,0,.08); padding-top:10px; }
+  .emp-item{ display:block; padding:10px 10px; border-radius:12px; text-decoration:none; color:inherit; border:1px solid transparent; cursor:grab; }
+  .emp-item:hover{ background:rgba(0,0,0,.03); }
+  .emp-item.active{ border-color:rgba(59,130,246,.45); background:rgba(59,130,246,.08); }
+  .emp-item .name{ font-weight:950; }
+  .emp-item .meta{ font-size:12px; opacity:.75; margin-top:4px; }
+
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .toolbar-left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .pill{ padding:6px 10px; border-radius:999px; border:1px solid rgba(0,0,0,.12); background:rgba(0,0,0,.03); font-weight:900; font-size:12px; }
+  .badge{ padding:6px 10px; border-radius:999px; font-weight:950; font-size:12px; }
+  .badge.draft{ background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.25); }
+  .badge.published{ background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25); }
+
+  .controls{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .controls .ctrl{ display:flex; flex-direction:column; gap:4px; min-width:140px; }
+  .controls label{ font-size:12px; font-weight:900; opacity:.85; }
+
+  /* Grid */
+  .cal-wrap{ overflow:auto; border-radius:14px; border:1px solid rgba(0,0,0,.10); margin-top:12px; }
+  .cal-grid{ display:grid; grid-template-columns: 70px repeat(7, 1fr); }
+  .cal-head{ position:sticky; top:0; z-index:6; background:#f7f7f8; border-bottom:1px solid rgba(0,0,0,.10); }
+  .cal-head .cell{ padding:10px; font-weight:950; }
+
+  .hour-col{ background:#fff; border-right:1px solid rgba(0,0,0,.10); }
+  .hour-cell{ height: var(--slot-h); border-bottom:1px solid rgba(0,0,0,.06); padding:6px 8px; font-size:12px; opacity:.70; }
+
+  .day-col{ position:relative; background:#fff; border-right:1px solid rgba(0,0,0,.06); }
+  .slot{ height: var(--slot-h); border-bottom:1px solid rgba(0,0,0,.06); }
+
+  .event{ position:absolute; left:6px; right:6px; border-radius:12px; padding:8px 10px; border:1px solid rgba(0,0,0,.10); box-shadow:0 2px 8px rgba(0,0,0,.06); font-weight:950; font-size:12px; line-height:1.1; user-select:none; }
+  .event small{ display:block; font-weight:650; opacity:.75; margin-top:4px; }
+  .event .del{ position:absolute; top:6px; right:8px; border:none; background:transparent; font-weight:950; cursor:pointer; opacity:.6; }
+  .event .del:hover{ opacity:1; }
+
+  .event.work{ background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.22); }
+  .event.leave{ background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.16); }
+  .event.block{ background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.22); }
+
+  .resize-handle{ position:absolute; left:0; right:0; bottom:0; height:10px; cursor:ns-resize; border-bottom-left-radius:12px; border-bottom-right-radius:12px; }
+
+  .issues{ margin-top:12px; }
+  .issues h4{ margin:0 0 8px 0; }
+  .issue{ padding:10px; border-radius:12px; border:1px solid rgba(0,0,0,.10); background:rgba(0,0,0,.02); margin-bottom:8px; }
+  .issue.error{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.06); }
+  .issue.warning{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.08); }
+  .issue .t{ font-weight:950; }
+  .issue .m{ opacity:.85; margin-top:4px; }
+
+  /* Modal confirm */
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:999; }
+  .modal{ width:min(760px, 92vw); max-height:86vh; overflow:auto; background:#fff; border-radius:18px; border:1px solid rgba(0,0,0,.15); padding:14px; }
+  .modal h3{ margin:0 0 10px 0; }
+  .modal .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
+
+  @media (max-width: 1100px){
+    .planner-layout{ flex-direction:column; }
+    .planner-left{ width:auto; max-width:none; }
+    .planner-right{ min-width:0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set g = group|default('CABINA') %}
+{% set st = (header.status if header else 'DRAFT')|default('DRAFT') %}
+
+<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+  <div>
+    <h2 style="margin:0;">Planificación semanal · {{ g }}</h2>
+    <p style="margin:6px 0 0 0; opacity:.85;">
+      Drag & drop desde la lista de empleados. Luego <b>mueve</b> o <b>redimensiona</b> los bloques (horas libres).
+    </p>
+  </div>
+
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a class="btn btn-secondary" href="{{ url_for('modulos.turnos_planificacion', group=g, start=prev_start, emp=selected_emp_id) }}">◀ Semana anterior</a>
+    <a class="btn btn-secondary" href="{{ url_for('modulos.turnos_planificacion', group=g, start=next_start, emp=selected_emp_id) }}">Semana siguiente ▶</a>
+    <a class="btn btn-ghost" href="{{ url_for('modulos.turnos', group=g) }}">Volver</a>
+  </div>
+</div>
+
+<hr style="margin:14px 0; opacity:.25;" />
+
+<div class="planner-layout">
+
+  <!-- LEFT: employee list -->
+  <div class="planner-left">
+    <div class="panel">
+      <h3>Empleados</h3>
+      <input id="empSearch" class="form-control emp-search" type="text" placeholder="Buscar…" />
+
+      <div class="emp-list" id="empList">
+        {% for e in employees %}
+          {% set eid = e.employee_id %}
+          <a class="emp-item {{ 'active' if selected_emp_id == eid else '' }}"
+             href="{{ url_for('modulos.turnos_planificacion', group=g, start=week_start, emp=eid) }}"
+             draggable="true"
+             data-emp-id="{{ eid }}"
+             data-emp-name="{{ (e.first_name|default('')) ~ ' ' ~ (e.last_name|default('')) }}"
+             data-search="{{ (e.doc_number|default('') ~ ' ' ~ e.first_name|default('') ~ ' ' ~ e.last_name|default(''))|lower }}">
+            <div class="name">{{ (e.first_name|default('')) ~ ' ' ~ (e.last_name|default('')) }}</div>
+            <div class="meta">{{ e.doc_number|default('') }}</div>
+          </a>
+        {% endfor %}
+      </div>
+
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <a class="btn btn-sm {{ 'btn-primary' if g=='CABINA' else 'btn-secondary' }}" href="{{ url_for('modulos.turnos_planificacion', group='CABINA', start=week_start, emp=selected_emp_id) }}">Cabina</a>
+        <a class="btn btn-sm {{ 'btn-primary' if g=='AJUSTADOR' else 'btn-secondary' }}" href="{{ url_for('modulos.turnos_planificacion', group='AJUSTADOR', start=week_start, emp=selected_emp_id) }}">Ajustador</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: planner -->
+  <div class="planner-right">
+    <div class="panel">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <span class="pill">Semana: {{ week_start }}</span>
+          <span class="pill">Week ID: {{ week_id }}</span>
+          <span class="badge {{ 'published' if st=='PUBLISHED' else 'draft' }}">{{ st }}</span>
+        </div>
+        <div class="toolbar-left" style="gap:8px;">
+          <button class="btn btn-secondary" type="button" id="btnDraft">Guardar borrador</button>
+          <button class="btn btn-secondary" type="button" id="btnValidate">Validar</button>
+          <button class="btn btn-primary" type="button" id="btnPublish">Publicar</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="ctrl">
+          <label>Rango visible (inicio)</label>
+          <input id="viewStart" class="form-control" type="time" step="900" value="06:00" />
+        </div>
+        <div class="ctrl">
+          <label>Rango visible (fin)</label>
+          <input id="viewEnd" class="form-control" type="time" step="900" value="22:00" />
+        </div>
+        <div class="ctrl">
+          <label>Resolución (min)</label>
+          <select id="gridStep" class="form-control">
+            <option value="15">15</option>
+            <option value="30" selected>30</option>
+            <option value="60">60</option>
+          </select>
+        </div>
+        <div class="ctrl">
+          <label>Duración al crear (h)</label>
+          <input id="defaultHours" class="form-control" type="number" min="1" max="16" step="0.5" value="8" />
+        </div>
+
+        <div class="ctrl" style="min-width:200px;">
+          <label>Cobertura mínima (opcional)</label>
+          <input id="covMin" class="form-control" type="number" min="0" step="1" placeholder="(vacío = no aplica)" />
+        </div>
+      </div>
+
+      <div id="statusMsg" style="margin-top:10px; font-size:13px; opacity:.9;"></div>
+
+      <div class="cal-wrap" id="calWrap" style="--slot-h: 24px;">
+        <div class="cal-grid cal-head" id="calHead"></div>
+        <div class="cal-grid" id="calBody"></div>
+      </div>
+
+      <div class="issues" id="issuesPanel" style="display:none;">
+        <h4>Alertas / Reglas</h4>
+        <div id="issuesList"></div>
+      </div>
+
+      <div style="margin-top:10px; font-size:13px; opacity:.85;">
+        <b>Reglas:</b> 44h/semana · descanso antes de 7 días · no 2 domingos seguidos · chequera/cumpleaños bloquean.
+        <br>
+        <b>Cobertura:</b> opcional. Si defines un mínimo, se reporta como advertencia.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirm publish -->
+<div class="modal-backdrop" id="confirmBackdrop" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>Publicar con alertas</h3>
+    <p style="opacity:.85; margin:0 0 10px 0;">
+      Hay alertas. Puedes publicar igual, pero quedará registrado que confirmaste.
+    </p>
+    <div id="confirmIssues"></div>
+    <div class="actions">
+      <button class="btn btn-secondary" type="button" id="btnCancelConfirm">Cancelar</button>
+      <button class="btn btn-primary" type="button" id="btnDoConfirm">Confirmar y publicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const WEEK_ID = {{ week_id|int }};
+  const GROUP = {{ (group or 'CABINA')|tojson }};
+  const WEEK_START = {{ (week_start or '')|tojson }}; // 'YYYY-MM-DD'
+  const SELECTED_EMP = {{ (selected_emp_id or 0)|int }};
+
+  // UI elements
+  const empSearch = document.getElementById('empSearch');
+  const empList = document.getElementById('empList');
+  const viewStart = document.getElementById('viewStart');
+  const viewEnd = document.getElementById('viewEnd');
+  const gridStep = document.getElementById('gridStep');
+  const defaultHours = document.getElementById('defaultHours');
+  const covMin = document.getElementById('covMin');
+  const calHead = document.getElementById('calHead');
+  const calBody = document.getElementById('calBody');
+  const calWrap = document.getElementById('calWrap');
+  const statusMsg = document.getElementById('statusMsg');
+  const issuesPanel = document.getElementById('issuesPanel');
+  const issuesList = document.getElementById('issuesList');
+
+  const btnDraft = document.getElementById('btnDraft');
+  const btnValidate = document.getElementById('btnValidate');
+  const btnPublish = document.getElementById('btnPublish');
+
+  const confirmBackdrop = document.getElementById('confirmBackdrop');
+  const confirmIssues = document.getElementById('confirmIssues');
+  const btnCancelConfirm = document.getElementById('btnCancelConfirm');
+  const btnDoConfirm = document.getElementById('btnDoConfirm');
+
+  // Local settings
+  const LS_KEY = 'rrhh_turnos_planner_settings';
+  function loadSettings(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return;
+      const s = JSON.parse(raw);
+      if(s.viewStart) viewStart.value = s.viewStart;
+      if(s.viewEnd) viewEnd.value = s.viewEnd;
+      if(s.gridStep) gridStep.value = String(s.gridStep);
+      if(s.defaultHours) defaultHours.value = String(s.defaultHours);
+    }catch(e){}
+  }
+  function saveSettings(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        viewStart: viewStart.value,
+        viewEnd: viewEnd.value,
+        gridStep: parseInt(gridStep.value,10),
+        defaultHours: parseFloat(defaultHours.value||'8'),
+      }));
+    }catch(e){}
+  }
+
+  // Parse HH:MM -> minutes
+  function hhmmToMin(hhmm){
+    const [h,m] = (hhmm||'00:00').split(':');
+    return (parseInt(h,10)||0)*60 + (parseInt(m,10)||0);
+  }
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+
+  function isoDate(d){
+    return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+  }
+
+  function parseISODate(s){
+    // s = 'YYYY-MM-DD'
+    const [y,m,d] = s.split('-').map(x=>parseInt(x,10));
+    return new Date(y, m-1, d, 0,0,0,0);
+  }
+
+  function fmtTime(min){
+    const h = Math.floor(min/60);
+    const m = min%60;
+    return pad2(h)+':'+pad2(m);
+  }
+
+  function setMsg(msg, kind){
+    statusMsg.textContent = msg || '';
+    statusMsg.style.color = (kind==='error' ? '#b91c1c' : (kind==='ok' ? '#065f46' : ''));
+  }
+
+  // Build days
+  const weekStartDate = parseISODate(WEEK_START);
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(weekStartDate);
+    d.setDate(d.getDate()+i);
+    days.push(d);
+  }
+
+  // Render grid
+  function renderGrid(){
+    saveSettings();
+
+    const step = parseInt(gridStep.value,10);
+    const slotH = 24; // px per step
+    calWrap.style.setProperty('--slot-h', slotH+'px');
+
+    const startMin = hhmmToMin(viewStart.value);
+    const endMin = hhmmToMin(viewEnd.value);
+    const totalMin = Math.max(step, endMin - startMin);
+    const slots = Math.ceil(totalMin / step);
+
+    // Header
+    calHead.innerHTML = '';
+    const empty = document.createElement('div');
+    empty.className='cell';
+    empty.style.borderRight='1px solid rgba(0,0,0,.10)';
+    calHead.appendChild(empty);
+
+    const wd = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    days.forEach((d)=>{
+      const cell = document.createElement('div');
+      cell.className='cell';
+      cell.style.borderRight='1px solid rgba(0,0,0,.06)';
+      cell.innerHTML = wd[d.getDay()==0?6:d.getDay()-1] + ' ' + pad2(d.getDate())+'/'+pad2(d.getMonth()+1);
+      calHead.appendChild(cell);
+    });
+
+    // Body
+    calBody.innerHTML = '';
+
+    const hourCol = document.createElement('div');
+    hourCol.className='hour-col';
+    for(let i=0;i<slots;i++){
+      const m = startMin + i*step;
+      const div = document.createElement('div');
+      div.className='hour-cell';
+      // Only label full hours to reduce noise
+      if((m % 60)===0){
+        div.textContent = fmtTime(m);
+      } else {
+        div.textContent = '';
+      }
+      hourCol.appendChild(div);
+    }
+    calBody.appendChild(hourCol);
+
+    // Day columns
+    days.forEach((d, dayIndex)=>{
+      const col = document.createElement('div');
+      col.className='day-col';
+      col.dataset.dayIndex = String(dayIndex);
+
+      // drop target
+      col.addEventListener('dragover', (ev)=>{ ev.preventDefault(); });
+      col.addEventListener('drop', async (ev)=>{
+        ev.preventDefault();
+        const empId = ev.dataTransfer.getData('text/emp');
+        const empName = ev.dataTransfer.getData('text/empName');
+        if(!empId) return;
+
+        const rect = col.getBoundingClientRect();
+        const y = ev.clientY - rect.top;
+        const minFromStart = Math.max(0, Math.round((y / slotH) * step));
+        const snapped = Math.floor(minFromStart / step) * step;
+        const startM = startMin + snapped;
+
+        const start = new Date(d);
+        start.setHours(0,0,0,0);
+        start.setMinutes(startM);
+
+        const durMin = Math.round((parseFloat(defaultHours.value||'8')*60)/step)*step;
+        const end = new Date(start.getTime() + durMin*60000);
+
+        try{
+          await apiCreateEvent(parseInt(empId,10), start, end);
+          setMsg('Creado: '+(empName||'')+' '+isoDate(d)+' '+fmtTime(startM), 'ok');
+          // ir a la vista de ese empleado
+          window.location.href = buildPageUrl({emp: empId});
+        }catch(e){
+          setMsg('No se pudo crear: '+e, 'error');
+        }
+      });
+
+      for(let i=0;i<slots;i++){
+        const s = document.createElement('div');
+        s.className='slot';
+        col.appendChild(s);
+      }
+
+      calBody.appendChild(col);
+    });
+
+    // Re-render events after grid
+    loadAndRenderEvents();
+  }
+
+  function buildPageUrl(params){
+    const url = new URL(window.location.href);
+    Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
+    url.searchParams.set('group', GROUP);
+    url.searchParams.set('start', WEEK_START);
+    return url.toString();
+  }
+
+  // API helpers
+  async function apiGetEvents(empId){
+    const u = new URL('/api/turnos/events', window.location.origin);
+    u.searchParams.set('week_id', String(WEEK_ID));
+    u.searchParams.set('emp', String(empId));
+    const r = await fetch(u.toString(), {credentials:'same-origin'});
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j;
+  }
+
+  async function apiCreateEvent(empId, start, end){
+    const r = await fetch('/api/turnos/events', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({
+        week_id: WEEK_ID,
+        employee_id: empId,
+        group: GROUP,
+        start: start.toISOString().slice(0,19).replace('T',' '),
+        end: end.toISOString().slice(0,19).replace('T',' '),
+        event_type: 'WORK'
+      })
+    });
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j;
+  }
+
+  async function apiUpdateEvent(eventId, start, end){
+    const r = await fetch('/api/turnos/events/'+eventId, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({
+        start: start.toISOString().slice(0,19).replace('T',' '),
+        end: end.toISOString().slice(0,19).replace('T',' ')
+      })
+    });
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j;
+  }
+
+  async function apiDeleteEvent(eventId){
+    const r = await fetch('/api/turnos/events/'+eventId, {method:'DELETE', credentials:'same-origin'});
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j;
+  }
+
+  async function apiValidate(){
+    const u = new URL('/api/turnos/week/validate', window.location.origin);
+    u.searchParams.set('week_id', String(WEEK_ID));
+    const r = await fetch(u.toString(), {credentials:'same-origin'});
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j.result;
+  }
+
+  async function apiSavePolicy(){
+    const minVal = (covMin.value||'').trim();
+    const r = await fetch('/api/turnos/week/policy', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({
+        week_id: WEEK_ID,
+        min: minVal,
+        start: viewStart.value,
+        end: viewEnd.value,
+        step_min: parseInt(gridStep.value,10)
+      })
+    });
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j;
+  }
+
+  async function apiDraft(){
+    const r = await fetch('/api/turnos/week/draft', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({week_id: WEEK_ID})
+    });
+    const j = await r.json();
+    if(!j.ok) throw (j.error||'error');
+    return j;
+  }
+
+  async function apiPublish(force){
+    const r = await fetch('/api/turnos/week/publish', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify({week_id: WEEK_ID, force: !!force})
+    });
+    const j = await r.json();
+    return j;
+  }
+
+  // Render events
+  function parseDateTime(s){
+    // 'YYYY-MM-DD HH:MM:SS' or 'YYYY-MM-DD HH:MM'
+    if(!s) return null;
+    const parts = s.replace('T',' ').split(' ');
+    const d = parts[0];
+    const t = (parts[1]||'00:00:00');
+    const [Y,M,D] = d.split('-').map(n=>parseInt(n,10));
+    const [hh,mm,ss] = t.split(':').map(n=>parseInt(n,10));
+    return new Date(Y, M-1, D, hh||0, mm||0, ss||0, 0);
+  }
+
+  function splitByDay(ev){
+    const segs = [];
+    let s = parseDateTime(ev.start);
+    let e = parseDateTime(ev.end);
+    if(!s || !e || e<=s) return segs;
+
+    while(s < e){
+      const dayStart = new Date(s); dayStart.setHours(0,0,0,0);
+      const nextDay = new Date(dayStart); nextDay.setDate(nextDay.getDate()+1);
+      const segEnd = e < nextDay ? e : nextDay;
+      segs.push({
+        event_id: ev.event_id,
+        employee_id: ev.employee_id,
+        event_type: ev.event_type,
+        leave_code: ev.leave_code,
+        start: new Date(s),
+        end: new Date(segEnd)
+      });
+      s = new Date(segEnd);
+    }
+    return segs;
+  }
+
+  function dayIndexOf(dt){
+    const d0 = new Date(weekStartDate); d0.setHours(0,0,0,0);
+    const d1 = new Date(dt); d1.setHours(0,0,0,0);
+    const diff = Math.round((d1 - d0) / 86400000);
+    return diff;
+  }
+
+  function clearRenderedEvents(){
+    document.querySelectorAll('.day-col .event').forEach(el=>el.remove());
+  }
+
+  let currentEvents = [];
+  let currentLeave = [];
+
+  async function loadAndRenderEvents(){
+    if(!SELECTED_EMP) return;
+    try{
+      const data = await apiGetEvents(SELECTED_EMP);
+      currentEvents = data.events || [];
+      currentLeave = data.leave || [];
+      renderEvents();
+    }catch(e){
+      setMsg('No se pudieron cargar eventos: '+e, 'error');
+    }
+  }
+
+  function renderEvents(){
+    clearRenderedEvents();
+
+    const step = parseInt(gridStep.value,10);
+    const slotH = 24;
+    const startMin = hhmmToMin(viewStart.value);
+    const endMin = hhmmToMin(viewEnd.value);
+    const minuteToPx = (slotH / step);
+
+    function addBlock(seg, cls, label){
+      const di = dayIndexOf(seg.start);
+      if(di < 0 || di > 6) return;
+
+      const col = document.querySelector('.day-col[data-day-index="'+di+'"]');
+      if(!col) return;
+
+      const sMin = seg.start.getHours()*60 + seg.start.getMinutes();
+      const eMin = seg.end.getHours()*60 + seg.end.getMinutes();
+
+      // clip to view
+      const topMin = Math.max(sMin, startMin);
+      const botMin = Math.min(eMin, endMin);
+      if(botMin <= startMin || topMin >= endMin || botMin <= topMin) return;
+
+      const topPx = (topMin - startMin) * minuteToPx;
+      const heightPx = (botMin - topMin) * minuteToPx;
+
+      const el = document.createElement('div');
+      el.className = 'event '+cls;
+      el.style.top = topPx+'px';
+      el.style.height = Math.max(22, heightPx)+'px';
+
+      el.innerHTML = '<button class="del" title="Eliminar">×</button>' +
+                     (label||'Bloque') +
+                     '<small>'+fmtTime(sMin)+'–'+fmtTime(eMin)+'</small>' +
+                     '<div class="resize-handle"></div>';
+
+      el.dataset.eventId = String(seg.event_id||'');
+      el.dataset.startIso = seg.start.toISOString();
+      el.dataset.endIso = seg.end.toISOString();
+      el.dataset.dayIndex = String(di);
+
+      // delete
+      el.querySelector('.del').addEventListener('click', async (ev)=>{
+        ev.stopPropagation();
+        const id = parseInt(el.dataset.eventId,10);
+        if(!id) return;
+        if(!confirm('Eliminar este bloque?')) return;
+        try{
+          await apiDeleteEvent(id);
+          setMsg('Bloque eliminado', 'ok');
+          loadAndRenderEvents();
+        }catch(e){
+          setMsg('No se pudo eliminar: '+e, 'error');
+        }
+      });
+
+      // drag move
+      attachDrag(el);
+      attachResize(el);
+
+      col.appendChild(el);
+    }
+
+    // Work events
+    currentEvents.forEach(ev=>{
+      splitByDay(ev).forEach(seg=>{
+        addBlock(seg, 'work', 'Trabajo');
+      });
+    });
+
+    // Blocking leave (chequera/cumple) as non-editable
+    currentLeave.forEach(lb=>{
+      const fake = {event_id: 0, start: parseDateTime(lb.start), end: parseDateTime(lb.end)};
+      if(!fake.start || !fake.end) return;
+      splitByDay({event_id:0, start:lb.start, end:lb.end}).forEach(seg=>{
+        addBlock(seg, 'block', lb.code || 'Bloqueo');
+      });
+    });
+
+    // Make blocks with event_id=0 non-interactive
+    document.querySelectorAll('.event.block').forEach(el=>{
+      el.querySelector('.del').style.display='none';
+      el.querySelector('.resize-handle').style.display='none';
+    });
+  }
+
+  function attachDrag(el){
+    let startX=0, startY=0, origTop=0, origDay=0, dragging=false;
+
+    el.addEventListener('mousedown', (ev)=>{
+      if(ev.target && ev.target.classList && ev.target.classList.contains('resize-handle')) return;
+      if(el.classList.contains('block')) return;
+
+      dragging = true;
+      startX = ev.clientX;
+      startY = ev.clientY;
+      origTop = parseFloat(el.style.top || '0');
+      origDay = parseInt(el.dataset.dayIndex||'0',10);
+      el.style.opacity = '0.85';
+      ev.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (ev)=>{
+      if(!dragging) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      el.style.top = Math.max(0, origTop + dy) + 'px';
+
+      // day move: compute day by x over columns
+      const bodyRect = calBody.getBoundingClientRect();
+      const x = ev.clientX - bodyRect.left;
+      // hour col is 70px
+      const colW = (bodyRect.width - 70) / 7;
+      const di = Math.max(0, Math.min(6, Math.floor((x - 70) / colW)));
+      el.dataset.dayIndex = String(di);
+    });
+
+    window.addEventListener('mouseup', async ()=>{
+      if(!dragging) return;
+      dragging = false;
+      el.style.opacity = '';
+
+      const id = parseInt(el.dataset.eventId||'0',10);
+      if(!id) return;
+
+      // compute new start/end based on top and day
+      const step = parseInt(gridStep.value,10);
+      const slotH = 24;
+      const startMin = hhmmToMin(viewStart.value);
+      const minutePerPx = step / slotH;
+
+      const topPx = parseFloat(el.style.top||'0');
+      const durPx = parseFloat(el.style.height||'24');
+
+      const newStartOffset = Math.round((topPx * minutePerPx) / step) * step;
+      const durMin = Math.max(step, Math.round((durPx * minutePerPx) / step) * step);
+
+      const di = parseInt(el.dataset.dayIndex||'0',10);
+      const day = new Date(days[di]);
+      day.setHours(0,0,0,0);
+
+      const start = new Date(day.getTime() + (startMin + newStartOffset) * 60000);
+      const end = new Date(start.getTime() + durMin * 60000);
+
+      try{
+        await apiUpdateEvent(id, start, end);
+        setMsg('Bloque movido', 'ok');
+        loadAndRenderEvents();
+      }catch(e){
+        setMsg('No se pudo mover: '+e, 'error');
+        loadAndRenderEvents();
+      }
+    });
+  }
+
+  function attachResize(el){
+    const handle = el.querySelector('.resize-handle');
+    if(!handle) return;
+
+    let startY=0, origH=0, resizing=false;
+
+    handle.addEventListener('mousedown', (ev)=>{
+      if(el.classList.contains('block')) return;
+      resizing = true;
+      startY = ev.clientY;
+      origH = parseFloat(el.style.height||'24');
+      el.style.opacity = '0.85';
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+
+    window.addEventListener('mousemove', (ev)=>{
+      if(!resizing) return;
+      const dy = ev.clientY - startY;
+      el.style.height = Math.max(22, origH + dy) + 'px';
+    });
+
+    window.addEventListener('mouseup', async ()=>{
+      if(!resizing) return;
+      resizing = false;
+      el.style.opacity = '';
+
+      const id = parseInt(el.dataset.eventId||'0',10);
+      if(!id) return;
+
+      // compute end based on height
+      const step = parseInt(gridStep.value,10);
+      const slotH = 24;
+      const startMin = hhmmToMin(viewStart.value);
+      const minutePerPx = step / slotH;
+
+      const topPx = parseFloat(el.style.top||'0');
+      const heightPx = parseFloat(el.style.height||'24');
+
+      const startOffset = Math.round((topPx * minutePerPx) / step) * step;
+      const durMin = Math.max(step, Math.round((heightPx * minutePerPx) / step) * step);
+
+      const di = parseInt(el.dataset.dayIndex||'0',10);
+      const day = new Date(days[di]);
+      day.setHours(0,0,0,0);
+
+      const start = new Date(day.getTime() + (startMin + startOffset) * 60000);
+      const end = new Date(start.getTime() + durMin * 60000);
+
+      try{
+        await apiUpdateEvent(id, start, end);
+        setMsg('Bloque ajustado', 'ok');
+        loadAndRenderEvents();
+      }catch(e){
+        setMsg('No se pudo ajustar: '+e, 'error');
+        loadAndRenderEvents();
+      }
+    });
+  }
+
+  // Search
+  empSearch.addEventListener('input', ()=>{
+    const q = (empSearch.value||'').toLowerCase().trim();
+    empList.querySelectorAll('.emp-item').forEach(a=>{
+      const s = (a.getAttribute('data-search')||'');
+      a.style.display = (!q || s.includes(q)) ? '' : 'none';
+    });
+  });
+
+  // Drag start
+  empList.querySelectorAll('.emp-item').forEach(a=>{
+    a.addEventListener('dragstart', (ev)=>{
+      ev.dataTransfer.setData('text/emp', a.dataset.empId);
+      ev.dataTransfer.setData('text/empName', a.dataset.empName||'');
+    });
+  });
+
+  // Controls
+  [viewStart, viewEnd, gridStep].forEach(el=>{
+    el.addEventListener('change', ()=>renderGrid());
+  });
+
+  defaultHours.addEventListener('change', ()=>saveSettings());
+
+  // Draft button
+  btnDraft.addEventListener('click', async ()=>{
+    try{
+      await apiSavePolicy();
+      await apiDraft();
+      setMsg('Borrador guardado.', 'ok');
+    }catch(e){
+      setMsg('No se pudo guardar borrador: '+e, 'error');
+    }
+  });
+
+  // Validate
+  btnValidate.addEventListener('click', async ()=>{
+    try{
+      const res = await apiValidate();
+      renderIssues(res);
+      setMsg('Validación actualizada.', 'ok');
+    }catch(e){
+      setMsg('No se pudo validar: '+e, 'error');
+    }
+  });
+
+  // Publish
+  btnPublish.addEventListener('click', async ()=>{
+    try{
+      await apiSavePolicy();
+      const j = await apiPublish(false);
+      if(j.needs_confirm){
+        showConfirm(j.result);
+        return;
+      }
+      if(j.ok){
+        setMsg('Semana publicada.', 'ok');
+        // refrescar para ver status
+        window.location.reload();
+        return;
+      }
+      setMsg('No se pudo publicar: '+(j.error||'error'), 'error');
+    }catch(e){
+      setMsg('No se pudo publicar: '+e, 'error');
+    }
+  });
+
+  btnCancelConfirm.addEventListener('click', ()=>{ hideConfirm(); });
+  btnDoConfirm.addEventListener('click', async ()=>{
+    try{
+      const j = await apiPublish(true);
+      if(j.ok){
+        hideConfirm();
+        setMsg('Semana publicada (confirmado).', 'ok');
+        window.location.reload();
+        return;
+      }
+      setMsg('No se pudo publicar: '+(j.error||'error'), 'error');
+    }catch(e){
+      setMsg('No se pudo publicar: '+e, 'error');
+    }
+  });
+
+  function renderIssues(res){
+    const issues = (res && res.issues) ? res.issues : [];
+    if(!issues.length){
+      issuesPanel.style.display = 'none';
+      issuesList.innerHTML = '';
+      return;
+    }
+    issuesPanel.style.display = '';
+    issuesList.innerHTML = '';
+
+    issues.slice(0, 200).forEach(it=>{
+      const div = document.createElement('div');
+      div.className = 'issue ' + (it.severity||'warning');
+      const who = it.employee_name ? (' · '+it.employee_name) : '';
+      div.innerHTML = '<div class="t">'+(it.rule||'RULE')+who+'</div>'+
+                      '<div class="m">'+(it.message||'')+'</div>';
+      issuesList.appendChild(div);
+    });
+  }
+
+  function showConfirm(res){
+    confirmIssues.innerHTML = '';
+    const issues = (res && res.issues) ? res.issues : [];
+    renderIssues(res);
+
+    const wrap = document.createElement('div');
+    wrap.style.marginTop = '8px';
+
+    issues.slice(0, 40).forEach(it=>{
+      const div = document.createElement('div');
+      div.className = 'issue ' + (it.severity||'warning');
+      const who = it.employee_name ? (' · '+it.employee_name) : '';
+      div.innerHTML = '<div class="t">'+(it.rule||'RULE')+who+'</div>'+
+                      '<div class="m">'+(it.message||'')+'</div>';
+      wrap.appendChild(div);
+    });
+
+    if(issues.length > 40){
+      const more = document.createElement('div');
+      more.style.opacity = '0.8';
+      more.textContent = '... ('+issues.length+' alertas en total)';
+      wrap.appendChild(more);
+    }
+
+    confirmIssues.appendChild(wrap);
+    confirmBackdrop.style.display = 'flex';
+  }
+
+  function hideConfirm(){
+    confirmBackdrop.style.display = 'none';
+  }
+
+  // Initialize
+  loadSettings();
+
+  // load policy into input
+  try{
+    const pol = {{ (policy or {})|tojson }};
+    if(pol && pol.rule && pol.rule.min){
+      covMin.value = String(pol.rule.min);
+    }
+  }catch(e){}
+
+  renderGrid();
+
+})();
+</script>
+
+{% endblock %}

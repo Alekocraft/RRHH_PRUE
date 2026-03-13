@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# Cargar .env ANTES de importar módulos que leen variables (LDAP/DB)
+ 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
@@ -17,7 +17,7 @@ from blueprints.modulos import modulos_bp
 def create_app():
     app = Flask(__name__)
 
-    # Usa SECRET_KEY del .env si existe
+ 
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
 
     login_manager = LoginManager()
@@ -36,8 +36,7 @@ def create_app():
     # -------------------------
     # Filtros de templates (UI)
     # -------------------------
-    # Nota: los estados en BD son *códigos* (normalmente en inglés) usados por el workflow.
-    # Para no romper la lógica, se traducen solo al momento de mostrar.
+ 
     _STATUS_ES = {
         # Workflow (inglés)
         "DRAFT": "Borrador",
@@ -48,7 +47,6 @@ def create_app():
         "SKIPPED": "Omitida",
         "CANCELLED": "Cancelada",
         "CANCELED": "Cancelada",
-        # Algunos módulos guardan estado en español
         "APROBADO": "Aprobado",
         "APROBADA": "Aprobada",
         "RECHAZADO": "Rechazado",

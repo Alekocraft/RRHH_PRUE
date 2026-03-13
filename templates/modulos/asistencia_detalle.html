@@ -9,8 +9,8 @@
     </div>
     <div class="card-actions">
       <a class="btn btn-secondary" href="{{ url_for('modulos.asistencia', year=year, month=month) }}">Volver</a>
-      <a class="btn btn-secondary" target="_blank" rel="noopener noreferrer" href="{{ url_for('modulos.asistencia_detalle_export', fmt='excel', employee_id=emp.employee_id, year=year, month=month) }}">Exportar Excel</a>
-      <a class="btn btn-secondary" target="_blank" rel="noopener noreferrer" href="{{ url_for('modulos.asistencia_detalle_export', fmt='pdf', employee_id=emp.employee_id, year=year, month=month) }}">Exportar PDF</a>
+      <a class="btn btn-secondary" target="_blank" href="{{ url_for('modulos.asistencia_detalle_export', fmt='excel', employee_id=emp.employee_id, year=year, month=month) }}">Exportar Excel</a>
+      <a class="btn btn-secondary" target="_blank" href="{{ url_for('modulos.asistencia_detalle_export', fmt='pdf', employee_id=emp.employee_id, year=year, month=month) }}">Exportar PDF</a>
     </div>
   </div>
 
@@ -23,7 +23,7 @@
     </div>
     <div class="card-body">
       <div class="alert alert-info" style="margin:0;">
-        Estados: <b>OK</b> cumple · <b>OK*</b> con ajuste manual · <b>I</b> incompleto · <b>F</b> faltante ·
+        Estados: <b>OK</b> cumple · <b>OK*</b> con ajuste manual · <b>I</b> incompleto · <b>F</b> faltante · <b>FEST</b> festivo ·
         <b>CASA</b> trabajo en casa · <b>VAC</b> vacaciones · <b>INC</b> incapacidad · <b>ST</b> sin turno.
       </div>
     </div>
@@ -58,6 +58,8 @@
                     <span class="badge badge-warn">{{ it.status }}</span>
                   {% elif it.status == 'F' %}
                     <span class="badge badge-danger">{{ it.status }}</span>
+                  {% elif it.status == 'FEST' %}
+                    <span class="badge badge-info">{{ it.status }}</span>
                   {% else %}
                     <span class="badge badge-secondary">{{ it.status }}</span>
                   {% endif %}

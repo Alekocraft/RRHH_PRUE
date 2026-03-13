@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Turnos · Mes{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+  <div>
+    <h2 style="margin:0;">Turnos · Mes</h2>
+    <p style="margin:6px 0 0 0; opacity:.85;">
+      Grupo: <b>{{ group }}</b> · Periodo: <b>{{ year }}-{{ "%02d"|format(month) }}</b>
+    </p>
+  </div>
+
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a class="btn btn-secondary" href="{{ url_for('modulos.turnos') }}">Volver a Turnos</a>
+  </div>
+</div>
+
+<hr style="margin:14px 0; opacity:.25;" />
+
+<form method="get" action="{{ url_for('modulos.turnos_mes', group=group) }}"
+      style="display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:12px;">
+  <div>
+    <label style="display:block; font-weight:700; margin-bottom:6px;">Año</label>
+    <input class="form-control" type="number" name="year" value="{{ year }}" min="2020" max="2100" />
+  </div>
+  <div>
+    <label style="display:block; font-weight:700; margin-bottom:6px;">Mes</label>
+    <input class="form-control" type="number" name="month" value="{{ month }}" min="1" max="12" />
+  </div>
+  <div>
+    <button class="btn btn-primary" type="submit">Ver</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body">
+    {% if not rows %}
+      <div class="flash info">
+        <div class="flash-title">Información</div>
+        <p>No hay asignaciones de turnos para este grupo en el mes seleccionado.</p>
+      </div>
+    {% else %}
+      <div style="overflow:auto;">
+        <table class="table" style="min-width:980px;">
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th style="white-space:nowrap;">Documento</th>
+              <th style="white-space:nowrap;">Turno</th>
+              <th style="white-space:nowrap;">Válido desde</th>
+              <th style="white-space:nowrap;">Válido hasta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td>{{ (r.first_name|default('')) ~ ' ' ~ (r.last_name|default('')) }}</td>
+                <td style="white-space:nowrap;">{{ r.doc_number|default('') }}</td>
+                <td style="white-space:nowrap;">
+                  {{ r.shift_code|default('—') }}
+                  {% if r.start_time and r.end_time %}
+                    <span style="opacity:.75; font-size:12px;">({{ r.start_time }}–{{ r.end_time }})</span>
+                  {% endif %}
+                </td>
+                <td style="white-space:nowrap;">{{ r.valid_from|default('') }}</td>
+                <td style="white-space:nowrap;">{{ r.valid_to|default('') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

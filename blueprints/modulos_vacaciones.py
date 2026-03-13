@@ -845,113 +845,113 @@ def vacaciones_cargar():
         flash(f"No se pudo leer el Excel: {ex}", "danger")
         return redirect(url_for("modulos.vacaciones_cargar"))
 
-total = 0
-matched = 0
-updated = 0
-errors = 0
+    total = 0
+    matched = 0
+    updated = 0
+    errors = 0
 
-as_of = date.today()
+    as_of = date.today()
 
-# Construye un mapa de empleados por cédula "normalizada" (solo dígitos)
-# para evitar fallos por formatos como 1023456789 / 1023-456-789 / espacios, etc.
-emp_rows = fetch_all("SELECT employee_id, doc_number FROM rrhh.hr_employee")
-emp_map: dict[str, int] = {}
-dup_docs: set[str] = set()
-for er in emp_rows or []:
-    key = _parse_doc_number(getattr(er, "doc_number", None))
-    if not key:
-        continue
-    if key in emp_map and emp_map[key] != int(er.employee_id):
-        dup_docs.add(key)
-    else:
-        emp_map[key] = int(er.employee_id)
+    # Construye un mapa de empleados por cédula "normalizada" (solo dígitos)
+    # para evitar fallos por formatos como 1023456789 / 1023-456-789 / espacios, etc.
+    emp_rows = fetch_all("SELECT employee_id, doc_number FROM rrhh.hr_employee")
+    emp_map: dict[str, int] = {}
+    dup_docs: set[str] = set()
+    for er in emp_rows or []:
+        key = _parse_doc_number(getattr(er, "doc_number", None))
+        if not key:
+            continue
+        if key in emp_map and emp_map[key] != int(er.employee_id):
+            dup_docs.add(key)
+        else:
+            emp_map[key] = int(er.employee_id)
 
-for r in rows:
-    total += 1
+    for r in rows:
+        total += 1
 
-    doc_raw = r.get("doc_number")
-    doc = _parse_doc_number(doc_raw) or ""
-    name = (r.get("employee_name") or "").strip() or None
-    used_days = float(r.get("used_days") or 0)
-    avail_days = float(r.get("available_days") or 0)
+        doc_raw = r.get("doc_number")
+        doc = _parse_doc_number(doc_raw) or ""
+        name = (r.get("employee_name") or "").strip() or None
+        used_days = float(r.get("used_days") or 0)
+        avail_days = float(r.get("available_days") or 0)
 
-    if not doc:
-        errors += 1
+        if not doc:
+            errors += 1
+            execute(
+                "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
+                "VALUES (?, ?, ?, ?, ?, NULL, 'ERROR', 'Cédula vacía o inválida en el Excel')",
+                (int(batch_id), str(doc_raw or "").strip() or None, name, used_days, avail_days),
+            )
+            continue
+
+        if doc in dup_docs:
+            errors += 1
+            execute(
+                "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
+                "VALUES (?, ?, ?, ?, ?, NULL, 'ERROR', 'Cédula duplicada en hr_employee (revisar registros)')",
+                (int(batch_id), doc, name, used_days, avail_days),
+            )
+            continue
+
+        emp_id = emp_map.get(doc)
+
+        if not emp_id:
+            errors += 1
+            execute(
+                "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
+                "VALUES (?, ?, ?, ?, ?, NULL, 'ERROR', 'Empleado no existe en hr_employee (cc no encontrada)')",
+                (int(batch_id), doc, name, used_days, avail_days),
+            )
+            continue
+
+        matched += 1
+
+        # Upsert balance
+        merge_sql = (
+            "MERGE rrhh.vacation_balance AS t "
+            "USING (SELECT ? AS employee_id) AS s "
+            "ON t.employee_id = s.employee_id "
+            "WHEN MATCHED THEN "
+            "  UPDATE SET available_days=?, used_days=?, as_of_date=?, source_batch_id=?, updated_by_user_id=?, updated_at=GETDATE() "
+            "WHEN NOT MATCHED THEN "
+            "  INSERT (employee_id, available_days, used_days, as_of_date, source_batch_id, updated_by_user_id) "
+            "  VALUES (?, ?, ?, ?, ?, ?);"
+        )
+
+        execute(
+            merge_sql,
+            (
+                int(emp_id),
+                avail_days,
+                used_days,
+                as_of,
+                int(batch_id),
+                int(current_user.user_id),
+                int(emp_id),
+                avail_days,
+                used_days,
+                as_of,
+                int(batch_id),
+                int(current_user.user_id),
+            ),
+        )
+        updated += 1
+
         execute(
             "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
-            "VALUES (?, ?, ?, ?, ?, NULL, 'ERROR', 'Cédula vacía o inválida en el Excel')",
-            (int(batch_id), str(doc_raw or "").strip() or None, name, used_days, avail_days),
+            "VALUES (?, ?, ?, ?, ?, ?, 'OK', NULL)",
+            (int(batch_id), doc, name, used_days, avail_days, int(emp_id)),
         )
-        continue
 
-    if doc in dup_docs:
-        errors += 1
         execute(
-            "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
-            "VALUES (?, ?, ?, ?, ?, NULL, 'ERROR', 'Cédula duplicada en hr_employee (revisar registros)')",
-            (int(batch_id), doc, name, used_days, avail_days),
+            "UPDATE rrhh.vacation_import_batch "
+            "SET status='APPLIED', total_rows=?, matched_rows=?, updated_rows=?, error_rows=? "
+            "WHERE batch_id=?",
+            (int(total), int(matched), int(updated), int(errors), int(batch_id)),
         )
-        continue
 
-    emp_id = emp_map.get(doc)
-
-    if not emp_id:
-        errors += 1
-        execute(
-            "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
-            "VALUES (?, ?, ?, ?, ?, NULL, 'ERROR', 'Empleado no existe en hr_employee (cc no encontrada)')",
-            (int(batch_id), doc, name, used_days, avail_days),
+        flash(
+            f"Importación aplicada. Total: {total}. Matched: {matched}. Actualizados: {updated}. Errores: {errors}.",
+            "success",
         )
-        continue
-
-    matched += 1
-
-    # Upsert balance
-    merge_sql = (
-        "MERGE rrhh.vacation_balance AS t "
-        "USING (SELECT ? AS employee_id) AS s "
-        "ON t.employee_id = s.employee_id "
-        "WHEN MATCHED THEN "
-        "  UPDATE SET available_days=?, used_days=?, as_of_date=?, source_batch_id=?, updated_by_user_id=?, updated_at=GETDATE() "
-        "WHEN NOT MATCHED THEN "
-        "  INSERT (employee_id, available_days, used_days, as_of_date, source_batch_id, updated_by_user_id) "
-        "  VALUES (?, ?, ?, ?, ?, ?);"
-    )
-
-    execute(
-        merge_sql,
-        (
-            int(emp_id),
-            avail_days,
-            used_days,
-            as_of,
-            int(batch_id),
-            int(current_user.user_id),
-            int(emp_id),
-            avail_days,
-            used_days,
-            as_of,
-            int(batch_id),
-            int(current_user.user_id),
-        ),
-    )
-    updated += 1
-
-    execute(
-        "INSERT INTO rrhh.vacation_import_row(batch_id, doc_number, employee_name, used_days, available_days, employee_id, status, error_msg) "
-        "VALUES (?, ?, ?, ?, ?, ?, 'OK', NULL)",
-        (int(batch_id), doc, name, used_days, avail_days, int(emp_id)),
-    )
-
-    execute(
-        "UPDATE rrhh.vacation_import_batch "
-        "SET status='APPLIED', total_rows=?, matched_rows=?, updated_rows=?, error_rows=? "
-        "WHERE batch_id=?",
-        (int(total), int(matched), int(updated), int(errors), int(batch_id)),
-    )
-
-    flash(
-        f"Importación aplicada. Total: {total}. Matched: {matched}. Actualizados: {updated}. Errores: {errors}.",
-        "success",
-    )
-    return redirect(url_for("modulos.vacaciones_cargar"))
+        return redirect(url_for("modulos.vacaciones_cargar"))

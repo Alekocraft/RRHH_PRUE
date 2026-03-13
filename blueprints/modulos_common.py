@@ -20,7 +20,7 @@ from services.hr_employee_service import (
     manager_has_subordinates,
 )
 from services.rrhh_db import fetch_one
-from services.rrhh_security import ROLE_ADMIN, ROLE_RRHH
+from services.rrhh_security import ROLE_ADMIN, ROLE_RRHH, ROLE_COORD_INDEM, ROLE_GERENTE_INDEM
 
 
 # -----------------------------------------------------------------------------
@@ -53,6 +53,36 @@ def _is_admin_or_rrhh() -> bool:
         or ("ADMINISTRADOR" in roles)
         or ("RRHH" in roles)
     )
+
+
+def _is_turnos_admin() -> bool:
+    """Acceso al módulo de Turnos (incluye tablero 24/7).
+
+    Roles permitidos:
+    - ADMINISTRADOR
+    - RRHH
+    - COORDINADOR_INDEMNIZACIONES
+    - GERENTE_INDEMNIZACIONES
+    """
+    roles = getattr(current_user, "roles", None) or []
+    return bool(
+        getattr(current_user, "is_admin", False)
+        or (ROLE_ADMIN in roles)
+        or (ROLE_RRHH in roles)
+        or (ROLE_COORD_INDEM in roles)
+        or (ROLE_GERENTE_INDEM in roles)
+        or ("ADMINISTRADOR" in roles)
+        or ("RRHH" in roles)
+        or ("COORDINADOR_INDEMNIZACIONES" in roles)
+        or ("GERENTE_INDEMNIZACIONES" in roles)
+    )
+
+
+def _require_turnos_admin() -> bool:
+    if _is_turnos_admin():
+        return True
+    flash("No tienes permisos para acceder a Turnos.", "warning")
+    return False
 
 
 # -----------------------------------------------------------------------------

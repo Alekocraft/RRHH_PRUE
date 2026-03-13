@@ -4,14 +4,29 @@ import io
 from datetime import datetime
 from typing import Iterable, List, Sequence
 
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
-from openpyxl.utils import get_column_letter
+# Dependencias opcionales:
+# - openpyxl (exportar a Excel)
+# - reportlab (exportar a PDF)
+#
+# En algunos entornos el portal corre con un requirements mínimo.
+# Para que el módulo "Reportes" no desaparezca por ImportError,
+# cargamos las dependencias de forma tolerante.
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+except Exception:  # pragma: no cover
+    Workbook = None
+    Font = Alignment = get_column_letter = None
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+except Exception:  # pragma: no cover
+    colors = A4 = landscape = getSampleStyleSheet = None
+    SimpleDocTemplate = Paragraph = Spacer = Table = TableStyle = None
 
 # Traducción de estados técnicos (workflow) a etiquetas en español para reportes (UI/export).
 _STATUS_ES = {
@@ -61,6 +76,11 @@ def build_excel(
     headers: Sequence[str],
     rows: Iterable[Sequence],
 ) -> bytes:
+    if Workbook is None:
+        raise RuntimeError(
+            "No se puede exportar a Excel porque falta la dependencia 'openpyxl'. "
+            "Instala: pip install openpyxl"
+        )
     """Build an XLSX payload.
 
     Fix: avoid iterating ws.columns when row 1 has merged cells (openpyxl returns MergedCell),
@@ -129,6 +149,11 @@ def build_pdf(
     headers: Sequence[str],
     rows: Iterable[Sequence],
 ) -> bytes:
+    if SimpleDocTemplate is None:
+        raise RuntimeError(
+            "No se puede exportar a PDF porque falta la dependencia 'reportlab'. "
+            "Instala: pip install reportlab"
+        )
     bio = io.BytesIO()
     doc = SimpleDocTemplate(
         bio,

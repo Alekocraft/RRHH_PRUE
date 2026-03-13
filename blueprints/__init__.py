@@ -1,1 +1,1 @@
-# blueprints package
+# config package

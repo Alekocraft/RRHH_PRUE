@@ -1,15 +1,26 @@
 ESTRUCTURA DEL PROYECTO FLASK 
 ============================= 
-Fecha: Tue 02/17/2026 18:27:23.43 
+Fecha: Tue 03/10/2026 11:01:34.55 
 Directorio actual: C:\Users\sinventarios\source\repos\rrhh_prue 
  
 [ARCHIVOS PRINCIPALES .PY] 
 -------------------------- 
 app.py 
 db.py 
+seguridadtest.py 
 blueprints\admin_rrhh.py 
 blueprints\auth.py 
 blueprints\modulos.py 
+blueprints\modulos_asistencia.py 
+blueprints\modulos_chequera.py 
+blueprints\modulos_common.py 
+blueprints\modulos_dashboard.py 
+blueprints\modulos_hora_flexible.py 
+blueprints\modulos_incapacidad.py 
+blueprints\modulos_reportes.py 
+blueprints\modulos_trabajo_casa.py 
+blueprints\modulos_turnos.py 
+blueprints\modulos_vacaciones.py 
 blueprints\__init__.py 
 config\db_config.py 
 config\ldap_config.py 
@@ -21,37 +32,66 @@ services\hr_employee_service.py
 services\ldap_auth.py 
 services\ldap_directory.py 
 services\org_excel.py 
+services\report_export.py 
 services\rrhh_db.py 
 services\rrhh_security.py 
 services\rrhh_user.py 
+services\schedule_service.py 
+services\turnos_roster_service.py 
 services\upload.py 
+services\workflow_service.py 
 services\__init__.py 
 utils\authz.py 
 utils\ldap_utils.py 
+utils\modulos.py 
 utils\__init__.py 
  
 [ARCHIVOS HTML en /templates/] 
 ------------------------------ 
 templates\base.html 
 templates\dashboard.html 
-templates\perfil_pendiente.html 
 templates\admin\empleado_editar.html 
 templates\admin\empleado_nuevo.html 
 templates\admin\usuarios.html 
+templates\admin\usuario_editar.html 
+templates\admin\usuario_form.html 
+templates\admin\usuario_nuevo.html 
 templates\auth\login.html 
 templates\auth\perfil_pendiente.html 
 templates\modulos\aprobaciones.html 
 templates\modulos\asistencia.html 
 templates\modulos\asistencia_ajuste.html 
 templates\modulos\asistencia_cargar.html 
+templates\modulos\asistencia_detalle.html 
+templates\modulos\chequera.html 
+templates\modulos\chequera_aprobaciones.html 
 templates\modulos\hora_flexible.html 
 templates\modulos\hora_flexible_nueva.html 
+templates\modulos\incapacidad.html 
+templates\modulos\incapacidad_aprobaciones.html 
+templates\modulos\incapacidad_equipo.html 
+templates\modulos\incapacidad_nueva.html 
+templates\modulos\reportes_detalle.html 
+templates\modulos\reportes_index.html 
 templates\modulos\trabajo_casa.html 
+templates\modulos\trabajo_casa_aprobaciones.html 
+templates\modulos\trabajo_casa_solicitar.html 
 templates\modulos\turnos.html 
 templates\modulos\turnos_asignar.html 
+templates\modulos\turnos_cobertura.html 
+templates\modulos\turnos_horas.html 
+templates\modulos\turnos_importar.html 
+templates\modulos\turnos_mes.html 
+templates\modulos\turnos_planificacion.html 
+templates\modulos\turnos_sesion.html 
+templates\modulos\turnos_tablero.html 
+templates\modulos\vacaciones.html 
+templates\modulos\vacaciones_aprobaciones.html 
+templates\modulos\vacaciones_carga.html 
  
 [ARCHIVOS CSS en /static/] 
 ------------------------- 
+static\css\align_logout.css 
 static\css\login.css 
 static\css\style.css 
  
@@ -73,6 +113,7 @@ requirements.txt
  
 [CARPETAS PRINCIPALES (excluyendo entornos virtuales)] 
 ------------------------------------------------------ 
+[.git] 
 [.vs] 
 [blueprints] 
 [config] 
@@ -82,13 +123,12 @@ requirements.txt
 [templates] 
 [uploads] 
 [utils] 
-[__pycache__] 
  
 Resumen: 
 --------- 
-Archivos .py: 24 
-Archivos HTML: 17 
-Archivos CSS: 2 
+Archivos .py: 40 
+Archivos HTML: 40 
+Archivos CSS: 3 
 Archivos JS: 0 
 Archivos de entorno: 2 
 Archivos de logs: 0 

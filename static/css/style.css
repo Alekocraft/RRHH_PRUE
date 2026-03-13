@@ -357,4 +357,3 @@ textarea{min-height:90px;resize:vertical}
 .label{display:block;font-size:12px;font-weight:950;color:#334155;margin-bottom:6px}
 .input{width:100%;padding:10px 12px;border-radius:14px;border:1px solid var(--border);background:#fff;color:var(--text);outline:none}
 .input:focus{border-color:rgba(0,152,177,.55);box-shadow:0 0 0 .18rem rgba(0,152,177,.14)}
-

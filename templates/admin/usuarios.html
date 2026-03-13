@@ -1,69 +1,63 @@
-
 {% extends "base.html" %}
+{% block title %}Usuarios · RRHH{% endblock %}
+
 {% block content %}
-<div class="card">
-  <div style="display:flex; align-items:center; gap:12px;">
-    <h2 style="margin:0;">Usuarios</h2>
-    <a href="{{ url_for('admin_rrhh.empleado_nuevo') }}"><button type="button">Crear colaborador</button></a>
+<div class="card" style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
+  <div>
+    <div class="card-title">Usuarios</div>
+    <div class="card-subtitle">Crea/edita el <b>usuario AD</b>, su <b>colaborador</b> asociado y sus <b>roles</b> desde un solo formulario.</div>
   </div>
-  <p class="small">Asocia usuarios AD a empleados (por cédula) y asigna el rol <b>Administrador</b>.</p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <a class="btn btn-primary" href="{{ url_for('admin_rrhh.usuario_nuevo') }}">Nuevo usuario / colaborador</a>
+  </div>
 </div>
 
 <div class="card">
   <div style="overflow:auto;">
-  <table>
-    <thead>
-      <tr>
-        <th>Usuario AD</th>
-        <th>Cédula</th>
-        <th>Nombre</th>
-        <th>Empleado asociado</th>
-        <th>Rol Administrador</th>
-        <th>Activo</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for u in usuarios %}
-      <tr>
-        <form method="post" action="{{ url_for('admin_rrhh.usuarios_actualizar') }}">
-          <input type="hidden" name="user_id" value="{{ u.user_id }}">
-          <td>{{ u.ad_username }}</td>
-          <td>{{ u.doc_number or '-' }}</td>
-          <td>{{ (u.first_name or '') ~ ' ' ~ (u.last_name or '') }}</td>
-
+    <table>
+      <thead>
+        <tr>
+          <th>Usuario AD</th>
+          <th>Colaborador</th>
+          <th>Cédula</th>
+          <th>Roles</th>
+          <th>Activo</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td><b>{{ u.ad_username }}</b></td>
           <td>
-            <select name="employee_id">
-              <option value="">-- seleccionar --</option>
-              {% for e in empleados %}
-                <option value="{{ e.employee_id }}" {% if u.employee_id == e.employee_id %}selected{% endif %}>
-                  {{ e.doc_number }} - {{ e.first_name }} {{ e.last_name }}
-                </option>
-              {% endfor %}
-            </select>
-            {% if u.employee_id %}
-              <div class="small" style="margin-top:4px;">
-                <a href="{{ url_for('admin_rrhh.empleado_editar', employee_id=u.employee_id) }}">Editar empleado</a>
-              </div>
+            {% if u.first_name or u.last_name %}
+              {{ (u.first_name or '') ~ ' ' ~ (u.last_name or '') }}
+            {% else %}
+              <span class="small" style="color:var(--muted);">— Sin colaborador asociado —</span>
             {% endif %}
           </td>
-
-          <td style="text-align:center;">
-            <input type="checkbox" name="role_ADMINISTRADOR" {% if 'ADMINISTRADOR' in u.roles %}checked{% endif %}>
-          </td>
-
-          <td style="text-align:center;">
-            <input type="checkbox" name="is_active" {% if u.is_active %}checked{% endif %}>
-          </td>
-
+          <td>{{ u.doc_number or '-' }}</td>
           <td>
-            <button type="submit">Guardar</button>
+            {% if u.roles and u.roles|length > 0 %}
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                {% for r in u.roles %}
+                  <span class="badge" style="border-radius:999px; padding:2px 8px; border:1px solid rgba(2,6,23,.10); font-size:12px;">
+                    {{ r }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="small" style="color:var(--muted);">(sin roles)</span>
+            {% endif %}
           </td>
-        </form>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+          <td style="text-align:center;">{{ 'Sí' if u.is_active else 'No' }}</td>
+          <td>
+            <a class="btn btn-ghost" href="{{ url_for('admin_rrhh.usuario_editar', user_id=u.user_id) }}">Editar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

@@ -557,7 +557,11 @@ def reportes_export(slug: str, fmt: str):
     ]
 
     if fmt == "excel":
-        payload = build_excel(title, headers, rows)
+        try:
+            payload = build_excel(title, headers, rows)
+        except Exception as ex:
+            flash(f"No se pudo exportar a Excel: {ex}", "warning")
+            return redirect(url_for("modulos.reportes_detalle", slug=slug, **request.args))
         fn = f"{base}.xlsx"
         return Response(
             payload,
@@ -565,7 +569,11 @@ def reportes_export(slug: str, fmt: str):
             headers={"Content-Disposition": f"attachment; filename=\"{fn}\""},
         )
 
-    payload = build_pdf(title, subtitle, headers, rows)
+    try:
+        payload = build_pdf(title, subtitle, headers, rows)
+    except Exception as ex:
+        flash(f"No se pudo exportar a PDF: {ex}", "warning")
+        return redirect(url_for("modulos.reportes_detalle", slug=slug, **request.args))
     fn = f"{base}.pdf"
     return Response(
         payload,

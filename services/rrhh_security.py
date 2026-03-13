@@ -8,6 +8,8 @@ from services.rrhh_db import fetch_one, fetch_all, execute
 ROLE_EMPLEADO = "EMPLEADO"
 ROLE_RRHH = "RRHH"
 ROLE_ADMIN = "ADMINISTRADOR"
+ROLE_COORD_INDEM = "COORDINADOR_INDEMNIZACIONES"
+ROLE_GERENTE_INDEM = "GERENTE_INDEMNIZACIONES"
 
 
 # -------------------------
@@ -32,6 +34,10 @@ def _role_name(role_code: str) -> str:
         return "Recursos Humanos"
     if role_code == ROLE_EMPLEADO:
         return "Empleado"
+    if role_code == ROLE_COORD_INDEM:
+        return "Coordinador de indemnizaciones"
+    if role_code == ROLE_GERENTE_INDEM:
+        return "Gerente de indemnizaciones"
     return role_code
 
 
